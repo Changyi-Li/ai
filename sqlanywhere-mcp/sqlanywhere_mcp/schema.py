@@ -432,6 +432,7 @@ def get_table_details(
 
 def list_views(
     owner: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = 100,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
@@ -441,12 +442,23 @@ def list_views(
     Uses modern SQL Anywhere system views (SYS.SYSTAB) with security filtering.
 
     Args:
-        owner: Filter by schema/owner (optional)
+        owner: Filter by schema/owner (optional, mutually exclusive with search)
+        search: Case-insensitive substring search on view names (optional, mutually exclusive with owner)
         limit: Maximum number of views to return
+        response_format: Output format (markdown or json)
 
     Returns:
-        Markdown formatted view list
+        Formatted view list in requested format
+
+    Raises:
+        ValueError: If both owner and search are provided
     """
+    # Validate mutually exclusive parameters
+    if owner and search:
+        raise ValueError(
+            "The 'owner' and 'search' parameters cannot be used together. "
+            "Please use one or the other, or neither for all views."
+        )
     cm, conn, cursor = get_connection_and_cursor()
 
     try:
@@ -454,7 +466,23 @@ def list_views(
 
         # Query SYS.SYSTAB for views (table_type = 21 = View)
         # SECURITY: Only expose views created by authorized users
-        if owner:
+        if search:
+            # Case-insensitive substring search using LOWER() function
+            base_query = """
+                SELECT t.table_name AS view_name, u.user_name AS owner_name
+                FROM SYS.SYSTAB t
+                JOIN SYS.SYSUSER u ON t.creator = u.user_id
+                WHERE LOWER(t.table_name) LIKE LOWER(?)
+                  AND t.table_type_str = 'VIEW'
+                  AND u.user_name IN ({users_filter})
+                ORDER BY t.table_name
+            """
+            # Add wildcards for substring matching
+            search_pattern = f"%{search}%"
+            query, params = _apply_security_filter_to_query(
+                base_query, authorized_users, [search_pattern]
+            )
+        elif owner:
             base_query = """
                 SELECT t.table_name AS view_name, u.user_name AS owner_name
                 FROM SYS.SYSTAB t
@@ -601,6 +629,7 @@ def get_view_details(
 
 def list_procedures(
     owner: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = 100,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
@@ -608,18 +637,44 @@ def list_procedures(
     List all stored procedures and functions.
 
     Args:
-        owner: Filter by schema/owner (optional)
+        owner: Filter by schema/owner (optional, mutually exclusive with search)
+        search: Case-insensitive substring search on procedure names (optional, mutually exclusive with owner)
         limit: Maximum number of procedures to return
+        response_format: Output format (markdown or json)
 
     Returns:
-        Markdown formatted procedure list
+        Formatted procedure list in requested format
+
+    Raises:
+        ValueError: If both owner and search are provided
     """
+    # Validate mutually exclusive parameters
+    if owner and search:
+        raise ValueError(
+            "The 'owner' and 'search' parameters cannot be used together. "
+            "Please use one or the other, or neither for all procedures."
+        )
     cm, conn, cursor = get_connection_and_cursor()
 
     try:
         authorized_users = cm._authorized_users
 
-        if owner:
+        if search:
+            # Case-insensitive substring search using LOWER() function
+            base_query = f"""
+                SELECT TOP {limit} p.proc_name, u.user_name AS owner_name
+                FROM SYS.SYSPROCEDURE p
+                JOIN SYS.SYSUSER u ON p.creator = u.user_id
+                WHERE LOWER(p.proc_name) LIKE LOWER(?)
+                  AND u.user_name IN ({{users_filter}})
+                ORDER BY p.proc_name
+            """
+            # Add wildcards for substring matching
+            search_pattern = f"%{search}%"
+            query, params = _apply_security_filter_to_query(
+                base_query, authorized_users, [search_pattern]
+            )
+        elif owner:
             base_query = f"""
                 SELECT TOP {limit} p.proc_name, u.user_name AS owner_name
                 FROM SYS.SYSPROCEDURE p

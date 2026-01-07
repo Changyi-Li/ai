@@ -22,6 +22,7 @@ npx @modelcontextprotocol/inspector python -m sqlanywhere_mcp.server
 ## Features
 
 - **Schema Discovery**: Retrieve tables, columns, views, stored procedures, indexes, and keys using modern SQL Anywhere system views
+- **Name Search**: Case-insensitive substring search for tables, views, and procedures
 - **Security Filtering**: Expose only schema objects from authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS)
 - **Data Queries**: Execute SELECT queries with configurable row limits
 - **Safe Operations**: Read-only access with comprehensive safety constraints
@@ -206,7 +207,10 @@ Only exposes tables created by authorized users (configured via SQLANYWHERE_AUTH
 **Parameters**:
 
 - `owner` (optional): Filter by schema/owner
+- `search` (optional): Search for tables by name substring (case-insensitive, mutually exclusive with owner)
+  - Example: 'part' matches 'PartTable', 'OrderPart', 'PartDetail'
 - `limit` (optional): Maximum number of tables to return (default: 100)
+- `response_format` (optional): Output format - "markdown" or "json" (default: "markdown")
 
 **Returns**: Table names, owners, types, and row counts
 
@@ -233,7 +237,10 @@ List all views in the database.
 **Parameters**:
 
 - `owner` (optional): Filter by schema/owner
-- `limit` (optional): Maximum number of views to return
+- `search` (optional): Search for views by name substring (case-insensitive, mutually exclusive with owner)
+  - Example: 'customer' matches 'CustomerView', 'AllCustomers', 'CustomerSummary'
+- `limit` (optional): Maximum number of views to return (default: 100)
+- `response_format` (optional): Output format - "markdown" or "json" (default: "markdown")
 
 **Returns**: View names, owners, and definitions
 
@@ -257,7 +264,10 @@ List all stored procedures and functions.
 **Parameters**:
 
 - `owner` (optional): Filter by schema/owner
-- `limit` (optional): Maximum number of procedures to return
+- `search` (optional): Search for procedures by name substring (case-insensitive, mutually exclusive with owner)
+  - Example: 'get' matches 'GetUser', 'getUserById', 'get_customer_data'
+- `limit` (optional): Maximum number of procedures to return (default: 100)
+- `response_format` (optional): Output format - "markdown" or "json" (default: "markdown")
 
 **Returns**: Procedure names, types, owners, and parameter counts
 
@@ -352,6 +362,48 @@ Get database metadata and connection information.
 **Returns**: Database name, version, charset, collation, connection details
 
 ## Examples
+
+### Search for tables by name
+
+```python
+# Search for tables containing 'part'
+sqlanywhere_list_tables(search="part")
+
+# Result from sqlanywhere_list_tables
+Tables: 3 (showing only authorized users)
+- monitor.Part (BASE, 9 rows)
+- monitor.OrderPart (BASE, 523 rows)
+- monitor.SparePart (BASE, 12 rows)
+
+# Case-insensitive search (same results)
+sqlanywhere_list_tables(search="PART")
+sqlanywhere_list_tables(search="Part")
+```
+
+### Search for views by name
+
+```python
+# Search for views containing 'customer'
+sqlanywhere_list_views(search="customer", limit=5)
+
+# Result from sqlanywhere_list_views
+Views: 2 (showing only authorized users)
+- monitor.CustomerView (VIEW)
+- monitor.AllCustomers (VIEW)
+```
+
+### Search for procedures by name
+
+```python
+# Search for procedures containing 'get'
+sqlanywhere_list_procedures(search="get", limit=10)
+
+# Result from sqlanywhere_list_procedures
+Procedures & Functions: 8 (showing only authorized users)
+- monitor.GetUserById (PROCEDURE)
+- monitor.GetCustomerData (PROCEDURE)
+- monitor.get_order_status (PROCEDURE)
+```
 
 ### List all tables
 

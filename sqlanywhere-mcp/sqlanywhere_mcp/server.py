@@ -138,7 +138,8 @@ async def handle_list_tools() -> list[Tool]:
             name="sqlanywhere_list_views",
             description="List all views in the database. "
             "Returns view names and owners. "
-            "Only exposes views created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS).",
+            "Only exposes views created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS). "
+            "Supports optional filtering by owner/schema and substring search on view names.",
             annotations={
                 "readOnlyHint": True,
                 "destructiveHint": False,
@@ -151,6 +152,11 @@ async def handle_list_tools() -> list[Tool]:
                     "owner": {
                         "type": "string",
                         "description": "Filter by schema/owner (optional)",
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "Search for views by name substring (case-insensitive, optional). "
+                            "Cannot be combined with owner filter. Example: 'customer' matches 'CustomerView', 'AllCustomers', 'CustomerSummary'",
                     },
                     "limit": {
                         "type": "integer",
@@ -200,7 +206,8 @@ async def handle_list_tools() -> list[Tool]:
             name="sqlanywhere_list_procedures",
             description="List all stored procedures and functions in the database. "
             "Returns procedure names and owners. "
-            "Only exposes procedures created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS).",
+            "Only exposes procedures created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS). "
+            "Supports optional filtering by owner/schema and substring search on procedure names.",
             annotations={
                 "readOnlyHint": True,
                 "destructiveHint": False,
@@ -213,6 +220,11 @@ async def handle_list_tools() -> list[Tool]:
                     "owner": {
                         "type": "string",
                         "description": "Filter by schema/owner (optional)",
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "Search for procedures by name substring (case-insensitive, optional). "
+                            "Cannot be combined with owner filter. Example: 'get' matches 'GetUser', 'getUserById', 'get_customer_data'",
                     },
                     "limit": {
                         "type": "integer",
@@ -498,8 +510,17 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
             return [TextContent(type="text", text=result)]
 
         elif name == "sqlanywhere_list_views":
+            # Validate mutually exclusive parameters
+            if arguments.get("owner") and arguments.get("search"):
+                return [TextContent(
+                    type="text",
+                    text="## Error\n\nThe 'owner' and 'search' parameters cannot be used together. "
+                    "Please use one or the other, or neither for all views."
+                )]
+
             result = schema.list_views(
                 owner=arguments.get("owner"),
+                search=arguments.get("search"),
                 limit=arguments.get("limit", 100),
                 response_format=response_format
             )
@@ -513,8 +534,17 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
             return [TextContent(type="text", text=result)]
 
         elif name == "sqlanywhere_list_procedures":
+            # Validate mutually exclusive parameters
+            if arguments.get("owner") and arguments.get("search"):
+                return [TextContent(
+                    type="text",
+                    text="## Error\n\nThe 'owner' and 'search' parameters cannot be used together. "
+                    "Please use one or the other, or neither for all procedures."
+                )]
+
             result = schema.list_procedures(
                 owner=arguments.get("owner"),
+                search=arguments.get("search"),
                 limit=arguments.get("limit", 100),
                 response_format=response_format
             )
