@@ -53,13 +53,13 @@ class IndexListResponse(BaseModel):
 
 class TableQueryInput(BaseModel):
     """Input validation for table-related queries."""
-    table_name: str = Field(..., min_length=3, max_length=200, description="Table name with schema prefix")
+    table_name: str = Field(..., min_length=3, max_length=200, description="Table name with owner prefix")
 
     @field_validator('table_name')
-    def validate_schema_prefix(cls, v):
-        """Validate that table_name includes schema prefix."""
+    def validate_owner_prefix(cls, v):
+        """Validate that table_name includes owner prefix."""
         if '.' not in v:
-            raise ValueError("Must include schema/owner prefix (e.g., 'monitor.Part', 'dbo.Customers')")
+            raise ValueError("Must include owner prefix (e.g., 'monitor.Part', 'dbo.Customers')")
         # Basic SQL injection prevention
         import re
         if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$", v):
@@ -181,7 +181,7 @@ class CheckConstraint(BaseModel):
 class TableInfo(BaseModel):
     """Information about a database table."""
     name: str = Field(description="Table name")
-    owner: str = Field(description="Table owner/schema")
+    owner: str = Field(description="Table owner")
     table_type: str = Field(description="TABLE or VIEW")
     row_count: Optional[int] = Field(default=None, description="Estimated row count")
     columns: List[ColumnInfo] = Field(description="Table columns")
@@ -194,7 +194,7 @@ class TableInfo(BaseModel):
 class ViewInfo(BaseModel):
     """Information about a database view."""
     name: str = Field(description="View name")
-    owner: str = Field(description="View owner/schema")
+    owner: str = Field(description="View owner")
     definition: Optional[str] = Field(default=None, description="View definition SQL")
     columns: List[ColumnInfo] = Field(default=[], description="View columns")
 
@@ -209,7 +209,7 @@ class ProcedureParameter(BaseModel):
 class ProcedureInfo(BaseModel):
     """Information about a stored procedure or function."""
     name: str = Field(description="Procedure name")
-    owner: str = Field(description="Procedure owner/schema")
+    owner: str = Field(description="Procedure owner")
     procedure_type: str = Field(description="PROCEDURE or FUNCTION")
     parameters: List[ProcedureParameter] = Field(description="Procedure parameters")
     return_type: Optional[str] = Field(default=None, description="Return type for functions")

@@ -14,48 +14,48 @@ def _validate_query_authorization(query: str, authorized_users: List[str]) -> No
     Validate that query only accesses tables/views from authorized users.
 
     This function parses the FROM clause and JOIN clauses to extract
-    schema.table references and validates them against the authorized users list.
+    owner.table references and validates them against the authorized users list.
 
     Args:
         query: SQL SELECT query to validate
-        authorized_users: List of authorized user/schema names
+        authorized_users: List of authorized owner names
 
     Raises:
-        QueryValidationError: If query references unauthorized schemas
+        QueryValidationError: If query references unauthorized owners
     """
-    # Pattern to match schema.table references in FROM and JOIN clauses
-    # Matches: schema.table, "schema"."table", [schema].[table], etc.
-    # This looks for FROM/JOIN followed by optional whitespace and schema.table pattern
+    # Pattern to match owner.table references in FROM and JOIN clauses
+    # Matches: owner.table, "owner"."table", [owner].[table], etc.
+    # This looks for FROM/JOIN followed by optional whitespace and owner.table pattern
     from_join_pattern = r'\b(?:FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\.\s*([a-zA-Z_][a-zA-Z0-9_]*)'
 
-    # Also handle quoted identifiers: "schema"."table" or [schema].[table]
+    # Also handle quoted identifiers: "owner"."table" or [owner].[table]
     quoted_pattern = r'\b(?:FROM|JOIN)\s+["\[]?([a-zA-Z_][a-zA-Z0-9_]*)["\]?\s*\.?\s*["\[]?([a-zA-Z_][a-zA-Z0-9_]*)["\]]?'
 
-    # Find all schema.table references
+    # Find all owner.table references
     from_join_matches = re.findall(from_join_pattern, query, re.IGNORECASE)
     quoted_matches = re.findall(quoted_pattern, query, re.IGNORECASE)
 
-    # Combine results and extract schemas
-    schemas = set()
+    # Combine results and extract owners
+    owners = set()
     for match in from_join_matches:
         if isinstance(match, tuple) and len(match) >= 1:
-            schemas.add(match[0].lower())
+            owners.add(match[0].lower())
 
     for match in quoted_matches:
         if isinstance(match, tuple) and len(match) >= 1:
-            schemas.add(match[0].lower())
+            owners.add(match[0].lower())
 
-    # Check if all schemas are authorized
+    # Check if all owners are authorized
     authorized_lower = [u.lower() for u in authorized_users]
 
-    unauthorized = schemas - set(authorized_lower)
+    unauthorized = owners - set(authorized_lower)
 
     if unauthorized:
         raise QueryValidationError(
             query,
-            f"Access to schemas {', '.join(sorted(unauthorized))} is not authorized. "
+            f"Access to owners {', '.join(sorted(unauthorized))} is not authorized. "
             f"Queries can only access tables/views owned by: {', '.join(sorted(authorized_users))}. "
-            f"Please ensure all FROM and JOIN clauses reference authorized schemas."
+            f"Please ensure all FROM and JOIN clauses reference authorized owners."
         )
 
 
@@ -77,7 +77,7 @@ def execute_query(
 
     Raises:
         ValueError: If query is not a SELECT statement
-        QueryValidationError: If query references unauthorized schemas
+        QueryValidationError: If query references unauthorized owners
     """
     # Validate query is SELECT only
     cleaned_query = query.strip().upper()
@@ -171,9 +171,9 @@ def query_builder(
     The WHERE clause should be a simple condition without user input.
 
     Args:
-        table_name: Table to query with schema/owner prefix (REQUIRED).
+        table_name: Table to query with owner prefix (REQUIRED).
             Examples: 'monitor.Part', 'dbo.Customers', 'ExtensionsUser.Config'.
-            Format must be: schema.TableName or owner.TableName
+            Format must be: owner.TableName
         columns: Columns to select (default: *)
         where: WHERE clause condition (optional, use with caution)
         order_by: ORDER BY clause (optional)
@@ -183,19 +183,19 @@ def query_builder(
         Markdown formatted query results
 
     Raises:
-        ValueError: If table_name is invalid or missing schema prefix
+        ValueError: If table_name is invalid or missing owner prefix
 
     Example:
         >>> query_builder(table_name='monitor.Part', columns='Id,PartNumber', limit=10)
         Returns: SELECT TOP 10 Id,PartNumber FROM monitor.Part
     """
     # Basic SQL injection prevention for table name
-    # Allow schema.table format (e.g., 'monitor.Part')
+    # Allow owner.table format (e.g., 'monitor.Part')
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$", table_name):
         raise InvalidParameterError(
             "table_name",
             f"Invalid table name: '{table_name}'. "
-            "Table name must include schema/owner prefix in format 'schema.TableName'. "
+            "Table name must include owner prefix in format 'owner.TableName'. "
             "Examples: 'monitor.Part', 'dbo.Customers', 'ExtensionsUser.Config'"
         )
 

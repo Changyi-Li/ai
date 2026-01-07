@@ -71,7 +71,7 @@ async def handle_list_tools() -> list[Tool]:
             description="List all tables in the database. "
             "Returns table names, owners, types, and row counts. "
             "Only exposes tables created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS). "
-            "Supports optional filtering by owner/schema and substring search on table names.",
+            "Supports optional filtering by owner and substring search on table names.",
             annotations={
                 "readOnlyHint": True,
                 "destructiveHint": False,
@@ -83,7 +83,7 @@ async def handle_list_tools() -> list[Tool]:
                 "properties": {
                     "owner": {
                         "type": "string",
-                        "description": "Filter by schema/owner (optional)",
+                        "description": "Filter by owner (optional)",
                     },
                     "search": {
                         "type": "string",
@@ -139,7 +139,7 @@ async def handle_list_tools() -> list[Tool]:
             description="List all views in the database. "
             "Returns view names and owners. "
             "Only exposes views created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS). "
-            "Supports optional filtering by owner/schema and substring search on view names.",
+            "Supports optional filtering by owner and substring search on view names.",
             annotations={
                 "readOnlyHint": True,
                 "destructiveHint": False,
@@ -151,7 +151,7 @@ async def handle_list_tools() -> list[Tool]:
                 "properties": {
                     "owner": {
                         "type": "string",
-                        "description": "Filter by schema/owner (optional)",
+                        "description": "Filter by owner (optional)",
                     },
                     "search": {
                         "type": "string",
@@ -207,7 +207,7 @@ async def handle_list_tools() -> list[Tool]:
             description="List all stored procedures and functions in the database. "
             "Returns procedure names and owners. "
             "Only exposes procedures created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS). "
-            "Supports optional filtering by owner/schema and substring search on procedure names.",
+            "Supports optional filtering by owner and substring search on procedure names.",
             annotations={
                 "readOnlyHint": True,
                 "destructiveHint": False,
@@ -219,7 +219,7 @@ async def handle_list_tools() -> list[Tool]:
                 "properties": {
                     "owner": {
                         "type": "string",
-                        "description": "Filter by schema/owner (optional)",
+                        "description": "Filter by owner (optional)",
                     },
                     "search": {
                         "type": "string",
@@ -359,7 +359,7 @@ async def handle_list_tools() -> list[Tool]:
             "Supports configurable row limits to prevent large result sets. "
             "IMPORTANT: Only allows queries on tables/views owned by authorized users "
             "(configured via SQLANYWHERE_AUTHORIZED_USERS). All FROM and JOIN clauses "
-            "must use schema.table format with authorized schemas.",
+            "must use owner.table format with authorized owners.",
             annotations={
                 "readOnlyHint": True,
                 "destructiveHint": False,
@@ -371,7 +371,7 @@ async def handle_list_tools() -> list[Tool]:
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "SQL SELECT query to execute. Must use schema.table format for all tables/views.",
+                        "description": "SQL SELECT query to execute. Must use owner.table format for all tables/views.",
                     },
                     "limit": {
                         "type": "integer",
@@ -392,7 +392,7 @@ async def handle_list_tools() -> list[Tool]:
             description="Build and execute a simple SELECT query with parameters. "
             "Convenience tool for safe query construction. "
             "Supports WHERE, ORDER BY, and TOP clauses. "
-            "IMPORTANT: table_name must include schema/owner prefix (e.g., 'monitor.Part', 'dbo.Customers').",
+            "IMPORTANT: table_name must include owner prefix (e.g., 'monitor.Part', 'dbo.Customers').",
             annotations={
                 "readOnlyHint": True,
                 "destructiveHint": False,
@@ -404,9 +404,9 @@ async def handle_list_tools() -> list[Tool]:
                 "properties": {
                     "table_name": {
                         "type": "string",
-                        "description": "Table to query with schema/owner prefix (REQUIRED). "
+                        "description": "Table to query with owner prefix (REQUIRED). "
                             "Examples: 'monitor.Part', 'dbo.Customers', 'ExtensionsUser.Config'. "
-                            "Format must be: schema.TableName",
+                            "Format must be: owner.TableName",
                     },
                     "columns": {
                         "type": "string",

@@ -23,7 +23,7 @@ npx @modelcontextprotocol/inspector python -m sqlanywhere_mcp.server
 
 - **Schema Discovery**: Retrieve tables, columns, views, stored procedures, indexes, and keys using modern SQL Anywhere system views
 - **Name Search**: Case-insensitive substring search for tables, views, and procedures
-- **Security Filtering**: Expose only schema objects from authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS)
+- **Security Filtering**: Expose only objects from authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS)
 - **Data Queries**: Execute SELECT queries with configurable row limits
 - **Safe Operations**: Read-only access with comprehensive safety constraints
 - **Structured Output**: Both human-readable Markdown and machine-readable JSON
@@ -108,7 +108,7 @@ SQLANYWHERE_PASSWORD=password     # (REQUIRED) Maps to PWD
 # SQLANYWHERE_USE_TCP=true         # Force TCP/IP instead of shared memory
 
 # Security Settings
-SQLANYWHERE_AUTHORIZED_USERS=monitor,ExtensionsUser  # Only expose schema from these users
+SQLANYWHERE_AUTHORIZED_USERS=monitor,ExtensionsUser  # Only expose objects from these users
 
 # Query Settings
 SQLANYWHERE_QUERY_TIMEOUT=30  # Query timeout in seconds
@@ -206,7 +206,7 @@ Only exposes tables created by authorized users (configured via SQLANYWHERE_AUTH
 
 **Parameters**:
 
-- `owner` (optional): Filter by schema/owner
+- `owner` (optional): Filter by owner
 - `search` (optional): Search for tables by name substring (case-insensitive, mutually exclusive with owner)
   - Example: 'part' matches 'PartTable', 'OrderPart', 'PartDetail'
 - `limit` (optional): Maximum number of tables to return (default: 100)
@@ -236,7 +236,7 @@ List all views in the database.
 
 **Parameters**:
 
-- `owner` (optional): Filter by schema/owner
+- `owner` (optional): Filter by owner
 - `search` (optional): Search for views by name substring (case-insensitive, mutually exclusive with owner)
   - Example: 'customer' matches 'CustomerView', 'AllCustomers', 'CustomerSummary'
 - `limit` (optional): Maximum number of views to return (default: 100)
@@ -263,7 +263,7 @@ List all stored procedures and functions.
 
 **Parameters**:
 
-- `owner` (optional): Filter by schema/owner
+- `owner` (optional): Filter by owner
 - `search` (optional): Search for procedures by name substring (case-insensitive, mutually exclusive with owner)
   - Example: 'get' matches 'GetUser', 'getUserById', 'get_customer_data'
 - `limit` (optional): Maximum number of procedures to return (default: 100)
@@ -331,8 +331,8 @@ Build and execute a simple SELECT query with parameters.
 
 **Parameters**:
 
-- `table_name` (required): Table to query with schema/owner prefix
-  - Format must be: `schema.TableName` or `owner.TableName`
+- `table_name` (required): Table to query with owner prefix
+  - Format must be: `owner.TableName`
   - Examples: `monitor.Part`, `dbo.Customers`, `ExtensionsUser.Config`
 - `columns` (optional): Columns to select (default: \*)
 - `where` (optional): WHERE clause (parameterized)
@@ -446,10 +446,10 @@ Indexes:
 - ...
 ```
 
-### Query with schema-qualified table name
+### Query with owner-qualified table name
 
 ```python
-# Using query_builder with schema prefix
+# Using query_builder with owner prefix
 sqlanywhere_query_builder(
     table_name="monitor.Part",
     columns="Id,PartNumber,Description",
@@ -490,7 +490,7 @@ Id | PartNumber | Type
 ## Security
 
 - **Read-Only**: `execute_query` only allows SELECT statements
-- **User Filtering**: `SQLANYWHERE_AUTHORIZED_USERS` environment variable restricts schema exposure to only specified users
+- **User Filtering**: `SQLANYWHERE_AUTHORIZED_USERS` environment variable restricts object exposure to only specified users
 - **Modern System Views**: Uses SQL Anywhere modern system views (SYS.SYSTAB, SYS.SYSTABCOL, etc.) with security filtering
 - **Row Limits**: Configurable maximum row limits prevent large result sets
 - **Connection Security**: Supports encrypted connections via ODBC parameters

@@ -28,7 +28,7 @@ class ConnectionManager:
         Parse authorized users from environment variable.
 
         Returns:
-            List of authorized user names for schema filtering
+            List of authorized user names for access control
         """
         users_str = os.getenv("SQLANYWHERE_AUTHORIZED_USERS", "monitor,ExtensionsUser")
         return [u.strip() for u in users_str.split(",") if u.strip()]

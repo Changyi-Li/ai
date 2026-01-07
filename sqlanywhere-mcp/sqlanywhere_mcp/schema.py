@@ -106,7 +106,7 @@ def list_tables(
     Uses modern SQL Anywhere system views (SYS.SYSTAB) with security filtering.
 
     Args:
-        owner: Filter by schema/owner (optional, mutually exclusive with search)
+        owner: Filter by owner (optional, mutually exclusive with search)
         search: Case-insensitive substring search on table names (optional, mutually exclusive with owner)
         limit: Maximum number of tables to return
         response_format: Output format (markdown or json)
@@ -442,7 +442,7 @@ def list_views(
     Uses modern SQL Anywhere system views (SYS.SYSTAB) with security filtering.
 
     Args:
-        owner: Filter by schema/owner (optional, mutually exclusive with search)
+        owner: Filter by owner (optional, mutually exclusive with search)
         search: Case-insensitive substring search on view names (optional, mutually exclusive with owner)
         limit: Maximum number of views to return
         response_format: Output format (markdown or json)
@@ -637,7 +637,7 @@ def list_procedures(
     List all stored procedures and functions.
 
     Args:
-        owner: Filter by schema/owner (optional, mutually exclusive with search)
+        owner: Filter by owner (optional, mutually exclusive with search)
         search: Case-insensitive substring search on procedure names (optional, mutually exclusive with owner)
         limit: Maximum number of procedures to return
         response_format: Output format (markdown or json)
