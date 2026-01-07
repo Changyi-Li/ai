@@ -27,6 +27,73 @@ from sqlanywhere_mcp.errors import DatabaseNotFoundError
 from sqlanywhere_mcp import formatters
 
 
+# ============================================================================
+# Security Filter Helper Functions
+# ============================================================================
+
+def _build_authorized_users_filter(users: List[str]) -> str:
+    """
+    Build parameter placeholder string for authorized users filter.
+
+    Args:
+        users: List of authorized user names
+
+    Returns:
+        Comma-separated question marks for SQL parameter placeholders
+    """
+    return ",".join(["?" for _ in users])
+
+
+def _apply_security_filter_to_query(
+    base_query: str,
+    users: List[str],
+    additional_params: Optional[List] = None
+) -> tuple:
+    """
+    Apply security filtering to a query with authorized users.
+
+    This helper function eliminates repeated code for building SQL queries
+    with user authorization filters.
+
+    Args:
+        base_query: SQL query with {users_filter} placeholder
+        users: List of authorized user names
+        additional_params: Optional additional query parameters
+
+    Returns:
+        Tuple of (query_with_filters, params) ready for cursor.execute()
+    """
+    users_filter = _build_authorized_users_filter(users)
+    query = base_query.replace("{users_filter}", users_filter)
+
+    if additional_params:
+        params = additional_params + users
+    else:
+        params = users
+
+    return query, params
+
+
+def get_connection_and_cursor():
+    """
+    Get database connection and cursor with consistent error handling.
+
+    Returns:
+        Tuple of (connection_manager, connection, cursor)
+
+    Raises:
+        DatabaseError: If connection fails
+    """
+    cm = get_connection_manager()
+    conn = cm.connect()
+    cursor = conn.cursor()
+    return cm, conn, cursor
+
+
+# ============================================================================
+# Schema Discovery Tools
+# ============================================================================
+
 def list_tables(
     owner: Optional[str] = None,
     limit: int = 100,
@@ -45,19 +112,15 @@ def list_tables(
     Returns:
         Formatted table list in requested format
     """
-    cm = get_connection_manager()
-    conn = cm.connect()
-    cursor = conn.cursor()
+    cm, conn, cursor = get_connection_and_cursor()
 
     try:
-        # Build the authorized users filter
         authorized_users = cm._authorized_users
-        users_filter = ",".join(["?" for _ in authorized_users])
 
         # Query SYS.SYSTAB system view for table information
         # SECURITY: Only expose tables created by authorized users
         if owner:
-            query = f"""
+            base_query = """
                 SELECT t.table_name, u.user_name AS owner_name, t.table_type_str, t.count
                 FROM SYS.SYSTAB t
                 JOIN SYS.SYSUSER u ON t.creator = u.user_id
@@ -66,10 +129,9 @@ def list_tables(
                   AND u.user_name IN ({users_filter})
                 ORDER BY t.table_name
             """
-            params = [owner] + authorized_users
-            cursor.execute(query, params)
+            query, params = _apply_security_filter_to_query(base_query, authorized_users, [owner])
         else:
-            query = f"""
+            base_query = """
                 SELECT t.table_name, u.user_name AS owner_name, t.table_type_str, t.count
                 FROM SYS.SYSTAB t
                 JOIN SYS.SYSUSER u ON t.creator = u.user_id
@@ -77,7 +139,9 @@ def list_tables(
                   AND u.user_name IN ({users_filter})
                 ORDER BY t.table_name
             """
-            cursor.execute(query, authorized_users)
+            query, params = _apply_security_filter_to_query(base_query, authorized_users)
+
+        cursor.execute(query, params)
 
         tables = cursor.fetchmany(limit)
 
@@ -129,25 +193,21 @@ def get_table_details(
     Returns:
         Markdown formatted table details
     """
-    cm = get_connection_manager()
-    conn = cm.connect()
-    cursor = conn.cursor()
+    cm, conn, cursor = get_connection_and_cursor()
 
     try:
         # Get table basic info with security filter
         authorized_users = cm._authorized_users
-        users_filter = ",".join(["?" for _ in authorized_users])
 
-        cursor.execute(
-            f"""
+        base_query = """
             SELECT t.table_name, u.user_name AS owner_name, t.table_type_str, t.count
             FROM SYS.SYSTAB t
             JOIN SYS.SYSUSER u ON t.creator = u.user_id
             WHERE t.table_name = ?
               AND u.user_name IN ({users_filter})
-            """,
-            [table_name] + authorized_users,
-        )
+        """
+        query, params = _apply_security_filter_to_query(base_query, authorized_users, [table_name])
+        cursor.execute(query, params)
         table_info = cursor.fetchone()
 
         if not table_info:
@@ -160,8 +220,7 @@ def get_table_details(
         row_count = table_info[3]
 
         # Get columns using SYS.SYSTABCOL with security filter
-        cursor.execute(
-            f"""
+        col_query = """
             SELECT
                 sc.column_name,
                 d.domain_name AS data_type,
@@ -176,10 +235,9 @@ def get_table_details(
             WHERE t.table_name = ?
               AND u.user_name IN ({users_filter})
             ORDER BY sc.column_id
-            """,
-            [table_name] + authorized_users,
-        )
-
+        """
+        query, params = _apply_security_filter_to_query(col_query, authorized_users, [table_name])
+        cursor.execute(query, params)
         columns_data = cursor.fetchall()
 
         # Build ColumnInfo models
@@ -199,8 +257,7 @@ def get_table_details(
             )
 
         # Get primary keys using SYS.SYSIDX (index_category = 1)
-        cursor.execute(
-            f"""
+        pk_query = """
             SELECT i.index_name, stc.column_name
             FROM SYS.SYSIDX i
             JOIN SYS.SYSIDXCOL ic ON i.index_id = ic.index_id AND i.table_id = ic.table_id
@@ -211,10 +268,9 @@ def get_table_details(
               AND i.index_category = 1
               AND u.user_name IN ({users_filter})
             ORDER BY i.index_name, ic.sequence
-            """,
-            [table_name] + authorized_users,
-        )
-
+        """
+        query, params = _apply_security_filter_to_query(pk_query, authorized_users, [table_name])
+        cursor.execute(query, params)
         pkeys_data = cursor.fetchall()
 
         # Build PrimaryKeyInfo models and mark primary key columns
@@ -241,8 +297,7 @@ def get_table_details(
                 col.is_primary_key = True
 
         # Get foreign keys using SYS.SYSFKEY
-        cursor.execute(
-            f"""
+        fk_query = """
             SELECT
                 fi.index_name AS foreign_key_name,
                 pt.table_name AS primary_table_name,
@@ -256,10 +311,9 @@ def get_table_details(
             WHERE ft.table_name = ?
               AND u.user_name IN ({users_filter})
             ORDER BY fi.index_name
-            """,
-            [table_name] + authorized_users,
-        )
-
+        """
+        query, params = _apply_security_filter_to_query(fk_query, authorized_users, [table_name])
+        cursor.execute(query, params)
         fkeys_data = cursor.fetchall()
 
         # Build ForeignKeyInfo models
@@ -277,8 +331,7 @@ def get_table_details(
             )
 
         # Get indexes using SYS.SYSIDX
-        cursor.execute(
-            f"""
+        idx_query = """
             SELECT i.index_name, i."unique", stc.column_name, ic."order"
             FROM SYS.SYSIDX i
             JOIN SYS.SYSIDXCOL ic ON i.index_id = ic.index_id AND i.table_id = ic.table_id
@@ -288,10 +341,9 @@ def get_table_details(
             WHERE t.table_name = ?
               AND u.user_name IN ({users_filter})
             ORDER BY i.index_name, ic.sequence
-            """,
-            [table_name] + authorized_users,
-        )
-
+        """
+        query, params = _apply_security_filter_to_query(idx_query, authorized_users, [table_name])
+        cursor.execute(query, params)
         indexes_data = cursor.fetchall()
 
         # Build IndexInfo models
@@ -368,19 +420,15 @@ def list_views(
     Returns:
         Markdown formatted view list
     """
-    cm = get_connection_manager()
-    conn = cm.connect()
-    cursor = conn.cursor()
+    cm, conn, cursor = get_connection_and_cursor()
 
     try:
-        # Build the authorized users filter
         authorized_users = cm._authorized_users
-        users_filter = ",".join(["?" for _ in authorized_users])
 
         # Query SYS.SYSTAB for views (table_type = 21 = View)
         # SECURITY: Only expose views created by authorized users
         if owner:
-            query = f"""
+            base_query = """
                 SELECT t.table_name AS view_name, u.user_name AS owner_name
                 FROM SYS.SYSTAB t
                 JOIN SYS.SYSUSER u ON t.creator = u.user_id
@@ -389,9 +437,9 @@ def list_views(
                   AND u.user_name IN ({users_filter})
                 ORDER BY t.table_name
             """
-            cursor.execute(query, [owner] + authorized_users)
+            query, params = _apply_security_filter_to_query(base_query, authorized_users, [owner])
         else:
-            query = f"""
+            base_query = """
                 SELECT t.table_name AS view_name, u.user_name AS owner_name
                 FROM SYS.SYSTAB t
                 JOIN SYS.SYSUSER u ON t.creator = u.user_id
@@ -399,7 +447,9 @@ def list_views(
                   AND u.user_name IN ({users_filter})
                 ORDER BY t.table_name
             """
-            cursor.execute(query, authorized_users)
+            query, params = _apply_security_filter_to_query(base_query, authorized_users)
+
+        cursor.execute(query, params)
 
         views = cursor.fetchmany(limit)
 
@@ -443,15 +493,12 @@ def get_view_details(
     Returns:
         Markdown formatted view details
     """
-    cm = get_connection_manager()
-    conn = cm.connect()
-    cursor = conn.cursor()
+    cm, conn, cursor = get_connection_and_cursor()
 
     try:
         authorized_users = cm._authorized_users
-        users_filter = ",".join(["?" for _ in authorized_users])
 
-        query = f"""
+        base_query = """
             SELECT t.table_name, u.user_name AS owner_name
             FROM SYS.SYSTAB t
             JOIN SYS.SYSUSER u ON t.creator = u.user_id
@@ -459,8 +506,9 @@ def get_view_details(
               AND t.table_type_str = 'VIEW'
               AND u.user_name IN ({users_filter})
         """
+        query, params = _apply_security_filter_to_query(base_query, authorized_users, [view_name])
 
-        cursor.execute(query, [view_name] + authorized_users)
+        cursor.execute(query, params)
         view_info = cursor.fetchone()
 
         if not view_info:
@@ -471,7 +519,7 @@ def get_view_details(
         owner_name = view_info[1]
 
         # Get columns using SYS.SYSTABCOL with SYS.SYSDOMAIN
-        col_query = f"""
+        col_query = """
             SELECT sc.column_name, d.domain_name AS data_type, sc.nulls
             FROM SYS.SYSTABCOL sc
             JOIN SYS.SYSDOMAIN d ON sc.domain_id = d.domain_id
@@ -482,8 +530,9 @@ def get_view_details(
               AND u.user_name IN ({users_filter})
             ORDER BY sc.column_id
         """
+        query, params = _apply_security_filter_to_query(col_query, authorized_users, [view_name])
 
-        cursor.execute(col_query, [view_name] + authorized_users)
+        cursor.execute(query, params)
         columns_data = cursor.fetchall()
 
         # Build ColumnInfo models
@@ -538,29 +587,30 @@ def list_procedures(
     Returns:
         Markdown formatted procedure list
     """
-    cm = get_connection_manager()
-    conn = cm.connect()
-    cursor = conn.cursor()
+    cm, conn, cursor = get_connection_and_cursor()
 
     try:
         authorized_users = cm._authorized_users
-        users_filter = ",".join(["?" for _ in authorized_users])
-
-        # Build WHERE clause first
-        where_clause = f"WHERE u.user_name IN ({users_filter})"
-        params = authorized_users
 
         if owner:
-            where_clause += " AND u.user_name = ?"
-            params = authorized_users + [owner]
-
-        query = f"""
-            SELECT TOP {limit} p.proc_name, u.user_name AS owner_name
-            FROM SYS.SYSPROCEDURE p
-            JOIN SYS.SYSUSER u ON p.creator = u.user_id
-            {where_clause}
-            ORDER BY p.proc_name
-        """
+            base_query = f"""
+                SELECT TOP {limit} p.proc_name, u.user_name AS owner_name
+                FROM SYS.SYSPROCEDURE p
+                JOIN SYS.SYSUSER u ON p.creator = u.user_id
+                WHERE u.user_name = ?
+                  AND u.user_name IN ({{users_filter}})
+                ORDER BY p.proc_name
+            """
+            query, params = _apply_security_filter_to_query(base_query, authorized_users, [owner])
+        else:
+            base_query = f"""
+                SELECT TOP {limit} p.proc_name, u.user_name AS owner_name
+                FROM SYS.SYSPROCEDURE p
+                JOIN SYS.SYSUSER u ON p.creator = u.user_id
+                WHERE u.user_name IN ({{users_filter}})
+                ORDER BY p.proc_name
+            """
+            query, params = _apply_security_filter_to_query(base_query, authorized_users)
 
         cursor.execute(query, params)
         procedures = cursor.fetchall()
@@ -608,23 +658,21 @@ def get_procedure_details(
     Returns:
         Markdown formatted procedure details
     """
-    cm = get_connection_manager()
-    conn = cm.connect()
-    cursor = conn.cursor()
+    cm, conn, cursor = get_connection_and_cursor()
 
     try:
         authorized_users = cm._authorized_users
-        users_filter = ",".join(["?" for _ in authorized_users])
 
-        query = f"""
+        base_query = """
             SELECT p.proc_name, u.user_name AS owner_name
             FROM SYS.SYSPROCEDURE p
             JOIN SYS.SYSUSER u ON p.creator = u.user_id
             WHERE p.proc_name = ?
               AND u.user_name IN ({users_filter})
         """
+        query, params = _apply_security_filter_to_query(base_query, authorized_users, [procedure_name])
 
-        cursor.execute(query, [procedure_name] + authorized_users)
+        cursor.execute(query, params)
         proc_info = cursor.fetchone()
 
         if not proc_info:
@@ -635,7 +683,7 @@ def get_procedure_details(
         owner_name = proc_info[1]
 
         # Get parameters using SYS.SYSPROCPARM with SYS.SYSDOMAIN for data types
-        param_query = f"""
+        param_query = """
             SELECT
                 pp.parm_name,
                 d.domain_name AS data_type,
@@ -650,8 +698,9 @@ def get_procedure_details(
               AND pp.parm_type = 0
             ORDER BY pp.parm_id
         """
+        query, params = _apply_security_filter_to_query(param_query, authorized_users, [procedure_name])
 
-        cursor.execute(param_query, [procedure_name] + authorized_users)
+        cursor.execute(query, params)
         params_data = cursor.fetchall()
 
         # Build ProcedureParameter models
@@ -712,30 +761,32 @@ def list_indexes(
     Returns:
         Markdown formatted index list
     """
-    cm = get_connection_manager()
-    conn = cm.connect()
-    cursor = conn.cursor()
+    cm, conn, cursor = get_connection_and_cursor()
 
     try:
         authorized_users = cm._authorized_users
-        users_filter = ",".join(["?" for _ in authorized_users])
-
-        # Build WHERE clause first
-        where_clause = f"WHERE u.user_name IN ({users_filter})"
-        params = authorized_users
 
         if table_name:
-            where_clause += " AND t.table_name = ?"
-            params = authorized_users + [table_name]
-
-        query = f"""
-            SELECT TOP {limit} i.index_name, t.table_name, i."unique", u.user_name AS owner_name
-            FROM SYS.SYSIDX i
-            JOIN SYS.SYSTAB t ON i.table_id = t.table_id
-            JOIN SYS.SYSUSER u ON t.creator = u.user_id
-            {where_clause}
-            ORDER BY t.table_name, i.index_name
-        """
+            base_query = f"""
+                SELECT TOP {limit} i.index_name, t.table_name, i."unique", u.user_name AS owner_name
+                FROM SYS.SYSIDX i
+                JOIN SYS.SYSTAB t ON i.table_id = t.table_id
+                JOIN SYS.SYSUSER u ON t.creator = u.user_id
+                WHERE t.table_name = ?
+                  AND u.user_name IN ({{users_filter}})
+                ORDER BY t.table_name, i.index_name
+            """
+            query, params = _apply_security_filter_to_query(base_query, authorized_users, [table_name])
+        else:
+            base_query = f"""
+                SELECT TOP {limit} i.index_name, t.table_name, i."unique", u.user_name AS owner_name
+                FROM SYS.SYSIDX i
+                JOIN SYS.SYSTAB t ON i.table_id = t.table_id
+                JOIN SYS.SYSUSER u ON t.creator = u.user_id
+                WHERE u.user_name IN ({{users_filter}})
+                ORDER BY t.table_name, i.index_name
+            """
+            query, params = _apply_security_filter_to_query(base_query, authorized_users)
 
         cursor.execute(query, params)
         indexes = cursor.fetchall()
@@ -783,15 +834,12 @@ def get_index_details(
     Returns:
         Markdown formatted index details
     """
-    cm = get_connection_manager()
-    conn = cm.connect()
-    cursor = conn.cursor()
+    cm, conn, cursor = get_connection_and_cursor()
 
     try:
         authorized_users = cm._authorized_users
-        users_filter = ",".join(["?" for _ in authorized_users])
 
-        query = f"""
+        base_query = """
             SELECT i.index_name, i."unique", t.table_name, u.user_name AS owner_name
             FROM SYS.SYSIDX i
             JOIN SYS.SYSTAB t ON i.table_id = t.table_id
@@ -799,8 +847,9 @@ def get_index_details(
             WHERE i.index_name = ?
               AND u.user_name IN ({users_filter})
         """
+        query, params = _apply_security_filter_to_query(base_query, authorized_users, [index_name])
 
-        cursor.execute(query, [index_name] + authorized_users)
+        cursor.execute(query, params)
         index_info = cursor.fetchone()
 
         if not index_info:
@@ -813,7 +862,7 @@ def get_index_details(
         owner_name = index_info[3]
 
         # Get index columns using SYS.SYSIDXCOL
-        col_query = f"""
+        col_query = """
             SELECT stc.column_name, ic."order", ic.sequence
             FROM SYS.SYSIDXCOL ic
             JOIN SYS.SYSIDX i ON ic.table_id = i.table_id AND ic.index_id = i.index_id
@@ -824,8 +873,9 @@ def get_index_details(
               AND u.user_name IN ({users_filter})
             ORDER BY ic.sequence
         """
+        query, params = _apply_security_filter_to_query(col_query, authorized_users, [index_name])
 
-        cursor.execute(col_query, [index_name] + authorized_users)
+        cursor.execute(query, params)
         columns_data = cursor.fetchall()
 
         # Build IndexColumn models
@@ -871,9 +921,7 @@ def get_database_info() -> str:
     Returns:
         Markdown formatted database information
     """
-    cm = get_connection_manager()
-    conn = cm.connect()
-    cursor = conn.cursor()
+    cm, conn, cursor = get_connection_and_cursor()
 
     try:
         output = []
@@ -914,34 +962,39 @@ def get_database_info() -> str:
 
         # Count tables (filtered by authorized users)
         authorized_users = cm._authorized_users
-        users_filter = ",".join(["?" for _ in authorized_users])
 
-        cursor.execute(f"""
+        base_query = """
             SELECT COUNT(*)
             FROM SYS.SYSTAB t
             JOIN SYS.SYSUSER u ON t.creator = u.user_id
             WHERE t.table_type_str = 'BASE'
               AND u.user_name IN ({users_filter})
-        """, authorized_users)
+        """
+        query, params = _apply_security_filter_to_query(base_query, authorized_users)
+        cursor.execute(query, params)
         table_count = cursor.fetchone()[0]
 
         # Count views (filtered by authorized users)
-        cursor.execute(f"""
+        base_query = """
             SELECT COUNT(*)
             FROM SYS.SYSTAB t
             JOIN SYS.SYSUSER u ON t.creator = u.user_id
             WHERE t.table_type_str = 'VIEW'
               AND u.user_name IN ({users_filter})
-        """, authorized_users)
+        """
+        query, params = _apply_security_filter_to_query(base_query, authorized_users)
+        cursor.execute(query, params)
         view_count = cursor.fetchone()[0]
 
         # Count procedures (filtered by authorized users)
-        cursor.execute(f"""
+        base_query = """
             SELECT COUNT(*)
             FROM SYS.SYSPROCEDURE p
             JOIN SYS.SYSUSER u ON p.creator = u.user_id
             WHERE u.user_name IN ({users_filter})
-        """, authorized_users)
+        """
+        query, params = _apply_security_filter_to_query(base_query, authorized_users)
+        cursor.execute(query, params)
         proc_count = cursor.fetchone()[0]
 
         output.append("### Database Objects")
