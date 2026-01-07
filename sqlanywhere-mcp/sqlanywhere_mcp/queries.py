@@ -59,7 +59,7 @@ def _validate_query_authorization(query: str, authorized_users: List[str]) -> No
         )
 
 
-def execute_query(
+async def execute_query(
     query: str,
     limit: Optional[int] = None,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
@@ -156,7 +156,7 @@ def execute_query(
         raise DatabaseError("query execution", e)
 
 
-def query_builder(
+async def query_builder(
     table_name: str,
     columns: Optional[str] = "*",
     where: Optional[str] = None,
@@ -242,7 +242,7 @@ def query_builder(
     return execute_query(query, limit, response_format=response_format)
 
 
-def validate_query(query: str) -> str:
+async def validate_query(query: str) -> str:
     """
     Validate a SQL query without executing it.
 

@@ -94,7 +94,7 @@ def get_connection_and_cursor():
 # Schema Discovery Tools
 # ============================================================================
 
-def list_tables(
+async def list_tables(
     owner: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = 100,
@@ -205,7 +205,7 @@ def list_tables(
         cursor.close()
 
 
-def get_table_details(
+async def get_table_details(
     table_name: str,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
@@ -430,7 +430,7 @@ def get_table_details(
         cursor.close()
 
 
-def list_views(
+async def list_views(
     owner: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = 100,
@@ -535,7 +535,7 @@ def list_views(
         cursor.close()
 
 
-def get_view_details(
+async def get_view_details(
     view_name: str,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
@@ -627,7 +627,7 @@ def get_view_details(
         cursor.close()
 
 
-def list_procedures(
+async def list_procedures(
     owner: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = 100,
@@ -727,7 +727,7 @@ def list_procedures(
         cursor.close()
 
 
-def get_procedure_details(
+async def get_procedure_details(
     procedure_name: str,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
@@ -828,7 +828,7 @@ def get_procedure_details(
         cursor.close()
 
 
-def list_indexes(
+async def list_indexes(
     table_name: Optional[str] = None,
     limit: int = 100,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
@@ -903,7 +903,7 @@ def list_indexes(
         cursor.close()
 
 
-def get_index_details(
+async def get_index_details(
     index_name: str,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
@@ -996,7 +996,7 @@ def get_index_details(
         cursor.close()
 
 
-def get_database_info() -> str:
+async def get_database_info() -> str:
     """
     Get database metadata and connection information.
 
