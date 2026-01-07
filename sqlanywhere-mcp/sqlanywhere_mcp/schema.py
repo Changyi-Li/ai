@@ -17,6 +17,7 @@ from sqlanywhere_mcp.models import (
     DatabaseInfo,
 )
 from sqlanywhere_mcp.db import get_connection_manager
+from sqlanywhere_mcp.errors import DatabaseNotFoundError
 
 
 def list_tables(owner: Optional[str] = None, limit: int = 100) -> str:
@@ -119,7 +120,7 @@ def get_table_details(table_name: str) -> str:
         table_info = cursor.fetchone()
 
         if not table_info:
-            return f"## Error: Table '{table_name}' not found or access denied"
+            raise DatabaseNotFoundError("table", table_name)
 
         output = []
         output.append(f"## Table: {table_info[1]}.{table_info[0]}")
@@ -355,7 +356,7 @@ def get_view_details(view_name: str) -> str:
         view_info = cursor.fetchone()
 
         if not view_info:
-            return f"## Error: View '{view_name}' not found or access denied"
+            raise DatabaseNotFoundError("view", view_name)
 
         output = []
         output.append(f"## View: {view_info[1]}.{view_info[0]}")
@@ -476,7 +477,7 @@ def get_procedure_details(procedure_name: str) -> str:
         proc_info = cursor.fetchone()
 
         if not proc_info:
-            return f"## Error: Procedure '{procedure_name}' not found or access denied"
+            raise DatabaseNotFoundError("procedure", procedure_name)
 
         output = []
         output.append(f"## Procedure: {proc_info[1]}.{proc_info[0]}")
@@ -617,7 +618,7 @@ def get_index_details(index_name: str) -> str:
         index_info = cursor.fetchone()
 
         if not index_info:
-            return f"## Error: Index '{index_name}' not found or access denied"
+            raise DatabaseNotFoundError("index", index_name)
 
         output = []
         output.append(f"## Index: {index_info[0]}")

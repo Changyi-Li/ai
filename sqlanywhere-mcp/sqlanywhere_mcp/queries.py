@@ -3,6 +3,7 @@
 import re
 from typing import Optional, List
 from sqlanywhere_mcp.db import get_connection_manager
+from sqlanywhere_mcp.errors import QueryValidationError, InvalidParameterError, DatabaseError
 
 
 def execute_query(query: str, limit: Optional[int] = None) -> str:
@@ -22,7 +23,8 @@ def execute_query(query: str, limit: Optional[int] = None) -> str:
     # Validate query is SELECT only
     cleaned_query = query.strip().upper()
     if not cleaned_query.startswith("SELECT"):
-        raise ValueError(
+        raise QueryValidationError(
+            query,
             "Only SELECT queries are allowed for security reasons. "
             "The query must start with 'SELECT'."
         )
@@ -44,7 +46,8 @@ def execute_query(query: str, limit: Optional[int] = None) -> str:
 
     for pattern in dangerous_patterns:
         if re.search(pattern, cleaned_query, re.IGNORECASE):
-            raise ValueError(
+            raise QueryValidationError(
+                query,
                 f"Dangerous keyword detected: {pattern}. "
                 "Only SELECT queries are allowed."
             )
@@ -57,7 +60,8 @@ def execute_query(query: str, limit: Optional[int] = None) -> str:
     else:
         # Enforce maximum limit
         if limit > cm.max_rows_limit:
-            raise ValueError(
+            raise InvalidParameterError(
+                "limit",
                 f"Requested limit {limit} exceeds maximum allowed limit of {cm.max_rows_limit}"
             )
 
@@ -105,7 +109,7 @@ def execute_query(query: str, limit: Optional[int] = None) -> str:
         return "\n".join(output)
 
     except Exception as e:
-        raise RuntimeError(f"Query execution failed: {str(e)}")
+        raise DatabaseError("query execution", e)
 
 
 def query_builder(
@@ -143,7 +147,8 @@ def query_builder(
     # Basic SQL injection prevention for table name
     # Allow schema.table format (e.g., 'monitor.Part')
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$", table_name):
-        raise ValueError(
+        raise InvalidParameterError(
+            "table_name",
             f"Invalid table name: '{table_name}'. "
             "Table name must include schema/owner prefix in format 'schema.TableName'. "
             "Examples: 'monitor.Part', 'dbo.Customers', 'ExtensionsUser.Config'"
@@ -154,12 +159,18 @@ def query_builder(
         col_list = [c.strip() for c in columns.split(",")]
         for col in col_list:
             if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", col):
-                raise ValueError(f"Invalid column name: '{col}'")
+                raise InvalidParameterError(
+                    "columns",
+                    f"Invalid column name: '{col}'"
+                )
 
     # Build query - Use TOP instead of LIMIT for SQL Anywhere
     if limit:
         if limit > 10000:
-            raise ValueError(f"Limit {limit} exceeds maximum of 10000")
+            raise InvalidParameterError(
+                "limit",
+                f"Limit {limit} exceeds maximum of 10000"
+            )
         query = f"SELECT TOP {limit} {columns} FROM {table_name}"
     else:
         query = f"SELECT {columns} FROM {table_name}"
@@ -168,12 +179,18 @@ def query_builder(
         # Basic validation for WHERE clause
         # Only allow simple conditions
         if re.search(r";|--|/\*|\*/", where, re.IGNORECASE):
-            raise ValueError("Invalid characters in WHERE clause")
+            raise InvalidParameterError(
+                "where",
+                "Invalid characters in WHERE clause"
+            )
         query += f" WHERE {where}"
 
     if order_by:
         if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?(,\s*[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?)*$", order_by, re.IGNORECASE):
-            raise ValueError(f"Invalid ORDER BY clause: '{order_by}'")
+            raise InvalidParameterError(
+                "order_by",
+                f"Invalid ORDER BY clause: '{order_by}'"
+            )
         query += f" ORDER BY {order_by}"
 
     # Execute the query

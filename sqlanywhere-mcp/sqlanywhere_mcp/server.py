@@ -15,6 +15,7 @@ from mcp.types import (
 
 from sqlanywhere_mcp import schema, queries
 from sqlanywhere_mcp.db import get_connection_manager
+from sqlanywhere_mcp.errors import MCPError
 
 # Create server instance
 server = Server("sqlanywhere-mcp")
@@ -51,6 +52,12 @@ async def handle_list_tools() -> list[Tool]:
             name="sqlanywhere_connect",
             description="Establish connection to SQL Anywhere database. "
             "Usually automatic, but can be called explicitly to verify connection.",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -64,6 +71,12 @@ async def handle_list_tools() -> list[Tool]:
             "Returns table names, owners, types, and row counts. "
             "Only exposes tables created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS). "
             "Supports optional filtering by owner/schema.",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -84,6 +97,12 @@ async def handle_list_tools() -> list[Tool]:
             description="Get comprehensive metadata for a specific table. "
             "Includes columns, data types, primary keys, foreign keys, indexes, "
             "and check constraints. Only accessible for tables created by authorized users.",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -102,6 +121,12 @@ async def handle_list_tools() -> list[Tool]:
             description="List all views in the database. "
             "Returns view names and owners. "
             "Only exposes views created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS).",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -122,6 +147,12 @@ async def handle_list_tools() -> list[Tool]:
             description="Get detailed information about a specific view. "
             "Includes column information with data types. "
             "Only accessible for views created by authorized users.",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -140,6 +171,12 @@ async def handle_list_tools() -> list[Tool]:
             description="List all stored procedures and functions in the database. "
             "Returns procedure names and owners. "
             "Only exposes procedures created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS).",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -160,6 +197,12 @@ async def handle_list_tools() -> list[Tool]:
             description="Get detailed information about a specific procedure or function. "
             "Includes parameters with data types and modes. "
             "Only accessible for procedures created by authorized users.",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -179,6 +222,12 @@ async def handle_list_tools() -> list[Tool]:
             "Returns index names, associated tables, uniqueness, and columns. "
             "Only exposes indexes on tables created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS). "
             "Can filter by specific table.",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -199,6 +248,12 @@ async def handle_list_tools() -> list[Tool]:
             description="Get detailed information about a specific index. "
             "Includes column details and ordering. "
             "Only accessible for indexes on tables created by authorized users.",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -217,6 +272,12 @@ async def handle_list_tools() -> list[Tool]:
             description="Get database metadata and connection information. "
             "Returns database name, version, character set, collation, "
             "and object counts (filtered by authorized users).",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -230,6 +291,12 @@ async def handle_list_tools() -> list[Tool]:
             "Only SELECT queries are allowed for security. "
             "Returns results with metadata (row count, execution time, column types). "
             "Supports configurable row limits to prevent large result sets.",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -251,6 +318,12 @@ async def handle_list_tools() -> list[Tool]:
             "Convenience tool for safe query construction. "
             "Supports WHERE, ORDER BY, and TOP clauses. "
             "IMPORTANT: table_name must include schema/owner prefix (e.g., 'monitor.Part', 'dbo.Customers').",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -285,6 +358,12 @@ async def handle_list_tools() -> list[Tool]:
             name="sqlanywhere_validate_query",
             description="Validate a SQL query without executing it. "
             "Performs basic validation checks for safety.",
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True
+            },
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -403,8 +482,12 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         else:
             raise ValueError(f"Unknown tool: {name}")
 
+    except MCPError as e:
+        # Custom MCP errors already have formatted messages
+        return [TextContent(type="text", text=str(e))]
     except Exception as e:
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        # Generic errors - wrap in simple error message
+        return [TextContent(type="text", text=f"## Error\n\n{str(e)}")]
 
 
 async def main():

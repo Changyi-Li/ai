@@ -5,6 +5,7 @@ import time
 from typing import Optional, List
 import pyodbc
 from dotenv import load_dotenv
+from sqlanywhere_mcp.errors import ConnectionError as MCPConnectionError
 
 # Load environment variables
 load_dotenv()
@@ -131,13 +132,9 @@ class ConnectionManager:
                     autocommit=True
                 )
             except pyodbc.Error as e:
-                raise ConnectionError(
-                    f"Failed to connect to SQL Anywhere database: {e}\n"
-                    f"Connection string: {self._connection_string}\n"
-                    f"Please verify:\n"
-                    f"1. SQL Anywhere ODBC driver is installed\n"
-                    f"2. Database server is running\n"
-                    f"3. Connection parameters are correct"
+                raise MCPConnectionError(
+                    message=f"Failed to connect to SQL Anywhere database: {e}",
+                    details=f"Connection string: {self._connection_string}"
                 ) from e
 
         return self._connection
