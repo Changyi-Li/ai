@@ -50,19 +50,34 @@ class ConnectionManager:
             return conn_str
 
         # Otherwise build from individual components
-        driver = os.getenv("SQLANYWHERE_DRIVER", "SQL Anywhere 17")
-        host = os.getenv("SQLANYWHERE_HOST")
-        port = os.getenv("SQLANYWHERE_PORT", "2638")
+        # Validate required parameters for Option 2
         database = os.getenv("SQLANYWHERE_DATABASE", "")
         user = os.getenv("SQLANYWHERE_USER", "")
         password = os.getenv("SQLANYWHERE_PASSWORD", "")
         server_name = os.getenv("SQLANYWHERE_SERVER_NAME", "")
-        use_tcp = os.getenv("SQLANYWHERE_USE_TCP", "false").lower() in ("true", "yes", "1")
 
+        missing_params = []
         if not database:
-            raise ValueError(
-                "SQLANYWHERE_DATABASE or SQLANYWHERE_CONNECTION_STRING must be provided"
+            missing_params.append("SQLANYWHERE_DATABASE")
+        if not user:
+            missing_params.append("SQLANYWHERE_USER")
+        if not password:
+            missing_params.append("SQLANYWHERE_PASSWORD")
+        if not server_name:
+            missing_params.append("SQLANYWHERE_SERVER_NAME")
+
+        if missing_params:
+            raise MCPConnectionError(
+                message=f"Missing required connection parameters: {', '.join(missing_params)}",
+                details="When using individual connection parameters (Option 2), the following are required: "
+                        f"SQLANYWHERE_SERVER_NAME, SQLANYWHERE_DATABASE, SQLANYWHERE_USER, SQLANYWHERE_PASSWORD. "
+                        f"Alternatively, provide a complete connection string via SQLANYWHERE_CONNECTION_STRING (Option 1)."
             )
+
+        driver = os.getenv("SQLANYWHERE_DRIVER", "SQL Anywhere 17")
+        host = os.getenv("SQLANYWHERE_HOST")
+        port = os.getenv("SQLANYWHERE_PORT", "2638")
+        use_tcp = os.getenv("SQLANYWHERE_USE_TCP", "false").lower() in ("true", "yes", "1")
 
         # Build connection string with SQL Anywhere-specific parameters
         parts = [
@@ -71,22 +86,9 @@ class ConnectionManager:
         ]
 
         # Add authentication
-        if user:
-            parts.append(f"UID={user}")
-        if password:
-            parts.append(f"PWD={password}")
-
-        # ServerName is required for all connections
-        if server_name:
-            parts.append(f"ServerName={server_name}")
-        else:
-            # Log warning but continue for backward compatibility
-            import warnings
-            warnings.warn(
-                "SQLANYWHERE_SERVER_NAME is not set. ServerName is recommended for all connections. "
-                "Set SQLANYWHERE_SERVER_NAME environment variable or use a complete connection string.",
-                UserWarning
-            )
+        parts.append(f"UID={user}")
+        parts.append(f"PWD={password}")
+        parts.append(f"ServerName={server_name}")
 
         # Add Host parameter for TCP/IP connections (Host=hostname:port format)
         if use_tcp and host:

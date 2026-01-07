@@ -100,11 +100,11 @@ SQLANYWHERE_CONNECTION_STRING="DRIVER={SQL Anywhere 17};ServerName=myserver;DBN=
 # SQLANYWHERE_CONNECTION_STRING="DRIVER={SQL Anywhere 17};ServerName=myserver;Host=localhost:2638;DBN=mydb;UID=dba;PWD=password"
 
 # Option 2: Individual parameters
-SQLANYWHERE_DATABASE=mydb       # Maps to DBN parameter
-SQLANYWHERE_USER=dba           # Maps to UID
-SQLANYWHERE_PASSWORD=password  # Maps to PWD
-SQLANYWHERE_SERVER_NAME=myserver  # Server name (required)
-# SQLANYWHERE_USE_TCP=true      # Force TCP/IP instead of shared memory
+SQLANYWHERE_SERVER_NAME=myserver  # (REQUIRED) Server name
+SQLANYWHERE_DATABASE=mydb         # (REQUIRED) Maps to DBN parameter
+SQLANYWHERE_USER=dba              # (REQUIRED) Maps to UID
+SQLANYWHERE_PASSWORD=password     # (REQUIRED) Maps to PWD
+# SQLANYWHERE_USE_TCP=true         # Force TCP/IP instead of shared memory
 
 # Security Settings
 SQLANYWHERE_AUTHORIZED_USERS=monitor,ExtensionsUser  # Only expose schema from these users
@@ -118,7 +118,7 @@ SQLANYWHERE_MAX_ROWS_LIMIT=10000  # Maximum allowed row limit
 **Important SQL Anywhere Connection Notes**:
 
 - Use `DBN` (DataBase Name) parameter, not `DATABASE`
-- `ServerName` is required for all connections
+- When using Option 2 (individual parameters), all four are required: `SQLANYWHERE_SERVER_NAME`, `SQLANYWHERE_DATABASE`, `SQLANYWHERE_USER`, `SQLANYWHERE_PASSWORD`
 - For local connections, shared memory is default and fastest (no host/port needed)
 - Use `Host=hostname:port` for TCP/IP connections
 - Only include host/port if using TCP/IP protocol or connecting to remote server
