@@ -9,6 +9,56 @@ from sqlanywhere_mcp.models import ResponseFormat, QueryResult
 from sqlanywhere_mcp import formatters
 
 
+def _validate_query_authorization(query: str, authorized_users: List[str]) -> None:
+    """
+    Validate that query only accesses tables/views from authorized users.
+
+    This function parses the FROM clause and JOIN clauses to extract
+    schema.table references and validates them against the authorized users list.
+
+    Args:
+        query: SQL SELECT query to validate
+        authorized_users: List of authorized user/schema names
+
+    Raises:
+        QueryValidationError: If query references unauthorized schemas
+    """
+    # Pattern to match schema.table references in FROM and JOIN clauses
+    # Matches: schema.table, "schema"."table", [schema].[table], etc.
+    # This looks for FROM/JOIN followed by optional whitespace and schema.table pattern
+    from_join_pattern = r'\b(?:FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\.\s*([a-zA-Z_][a-zA-Z0-9_]*)'
+
+    # Also handle quoted identifiers: "schema"."table" or [schema].[table]
+    quoted_pattern = r'\b(?:FROM|JOIN)\s+["\[]?([a-zA-Z_][a-zA-Z0-9_]*)["\]?\s*\.?\s*["\[]?([a-zA-Z_][a-zA-Z0-9_]*)["\]]?'
+
+    # Find all schema.table references
+    from_join_matches = re.findall(from_join_pattern, query, re.IGNORECASE)
+    quoted_matches = re.findall(quoted_pattern, query, re.IGNORECASE)
+
+    # Combine results and extract schemas
+    schemas = set()
+    for match in from_join_matches:
+        if isinstance(match, tuple) and len(match) >= 1:
+            schemas.add(match[0].lower())
+
+    for match in quoted_matches:
+        if isinstance(match, tuple) and len(match) >= 1:
+            schemas.add(match[0].lower())
+
+    # Check if all schemas are authorized
+    authorized_lower = [u.lower() for u in authorized_users]
+
+    unauthorized = schemas - set(authorized_lower)
+
+    if unauthorized:
+        raise QueryValidationError(
+            query,
+            f"Access to schemas {', '.join(sorted(unauthorized))} is not authorized. "
+            f"Queries can only access tables/views owned by: {', '.join(sorted(authorized_users))}. "
+            f"Please ensure all FROM and JOIN clauses reference authorized schemas."
+        )
+
+
 def execute_query(
     query: str,
     limit: Optional[int] = None,
@@ -27,6 +77,7 @@ def execute_query(
 
     Raises:
         ValueError: If query is not a SELECT statement
+        QueryValidationError: If query references unauthorized schemas
     """
     # Validate query is SELECT only
     cleaned_query = query.strip().upper()
@@ -61,6 +112,9 @@ def execute_query(
             )
 
     cm = get_connection_manager()
+
+    # Validate query against authorized users
+    _validate_query_authorization(query, cm._authorized_users)
 
     # Use configured default limit if not specified
     if limit is None:

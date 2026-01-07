@@ -356,7 +356,10 @@ async def handle_list_tools() -> list[Tool]:
             description="Execute a SELECT query on the database. "
             "Only SELECT queries are allowed for security. "
             "Returns results with metadata (row count, execution time, column types). "
-            "Supports configurable row limits to prevent large result sets.",
+            "Supports configurable row limits to prevent large result sets. "
+            "IMPORTANT: Only allows queries on tables/views owned by authorized users "
+            "(configured via SQLANYWHERE_AUTHORIZED_USERS). All FROM and JOIN clauses "
+            "must use schema.table format with authorized schemas.",
             annotations={
                 "readOnlyHint": True,
                 "destructiveHint": False,
@@ -368,7 +371,7 @@ async def handle_list_tools() -> list[Tool]:
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "SQL SELECT query to execute",
+                        "description": "SQL SELECT query to execute. Must use schema.table format for all tables/views.",
                     },
                     "limit": {
                         "type": "integer",
