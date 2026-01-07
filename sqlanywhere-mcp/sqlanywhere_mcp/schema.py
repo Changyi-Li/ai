@@ -1,6 +1,7 @@
 """Schema discovery tools for SQL Anywhere database."""
 
 import pyodbc
+import json
 from typing import Optional, List
 from mcp import Tool
 from sqlanywhere_mcp.models import (
@@ -15,12 +16,22 @@ from sqlanywhere_mcp.models import (
     ProcedureInfo,
     ProcedureParameter,
     DatabaseInfo,
+    ResponseFormat,
+    TableListResponse,
+    ViewListResponse,
+    ProcedureListResponse,
+    IndexListResponse,
 )
 from sqlanywhere_mcp.db import get_connection_manager
 from sqlanywhere_mcp.errors import DatabaseNotFoundError
+from sqlanywhere_mcp import formatters
 
 
-def list_tables(owner: Optional[str] = None, limit: int = 100) -> str:
+def list_tables(
+    owner: Optional[str] = None,
+    limit: int = 100,
+    response_format: ResponseFormat = ResponseFormat.MARKDOWN
+) -> str:
     """
     List all tables in the database.
 
@@ -29,9 +40,10 @@ def list_tables(owner: Optional[str] = None, limit: int = 100) -> str:
     Args:
         owner: Filter by schema/owner (optional)
         limit: Maximum number of tables to return
+        response_format: Output format (markdown or json)
 
     Returns:
-        Markdown formatted table list
+        Formatted table list in requested format
     """
     cm = get_connection_manager()
     conn = cm.connect()
@@ -69,24 +81,43 @@ def list_tables(owner: Optional[str] = None, limit: int = 100) -> str:
 
         tables = cursor.fetchmany(limit)
 
-        # Format output
-        output = []
-        output.append(f"## Tables ({len(tables)} found)")
-        output.append("")
-        output.append("| Table Name | Owner | Type | Row Count |")
-        output.append("|------------|-------|------|-----------|")
+        # Format output based on response_format
+        if response_format == ResponseFormat.JSON:
+            # Convert to Pydantic models and return JSON
+            table_models = []
+            for table_name, table_owner, table_type, row_count in tables:
+                table_models.append(
+                    TableInfo(
+                        name=table_name,
+                        owner=table_owner,
+                        table_type=table_type,
+                        row_count=row_count,
+                        columns=[],
+                        primary_keys=[],
+                        foreign_keys=[],
+                        indexes=[],
+                        check_constraints=[]
+                    )
+                )
 
-        for table_name, table_owner, table_type, row_count in tables:
-            row_count_str = f"{row_count:,}" if row_count else "N/A"
-            output.append(f"| {table_name} | {table_owner} | {table_type} | {row_count_str} |")
-
-        return "\n".join(output)
+            response = TableListResponse(
+                tables=table_models,
+                total_count=len(table_models),
+                has_more=False
+            )
+            return response.model_dump_json(indent=2)
+        else:
+            # Use formatter for markdown
+            return formatters.format_table_list_markdown(tables, len(tables))
 
     finally:
         cursor.close()
 
 
-def get_table_details(table_name: str) -> str:
+def get_table_details(
+    table_name: str,
+    response_format: ResponseFormat = ResponseFormat.MARKDOWN
+) -> str:
     """
     Get comprehensive metadata for a specific table.
 
@@ -122,11 +153,11 @@ def get_table_details(table_name: str) -> str:
         if not table_info:
             raise DatabaseNotFoundError("table", table_name)
 
-        output = []
-        output.append(f"## Table: {table_info[1]}.{table_info[0]}")
-        output.append(f"**Type**: {table_info[2]}")
-        output.append(f"**Row Count**: {table_info[3]:,}" if table_info[3] else "**Row Count**: N/A")
-        output.append("")
+        # Extract table info
+        table_name_result = table_info[0]
+        owner_name = table_info[1]
+        table_type = table_info[2]
+        row_count = table_info[3]
 
         # Get columns using SYS.SYSTABCOL with security filter
         cursor.execute(
@@ -149,19 +180,23 @@ def get_table_details(table_name: str) -> str:
             [table_name] + authorized_users,
         )
 
-        columns = cursor.fetchall()
-        output.append(f"### Columns ({len(columns)})")
-        output.append("")
-        output.append("| Column | Type | Length | Scale | Nullable | Default |")
-        output.append("|--------|------|--------|-------|----------|---------|")
+        columns_data = cursor.fetchall()
 
-        for col in columns:
+        # Build ColumnInfo models
+        column_models = []
+        for col in columns_data:
             col_name, domain_id, width, scale, nulls, default_val = col
-            nullable = "YES" if nulls == "Y" else "NO"
-            default = default_val if default_val else ""
-            output.append(f"| {col_name} | {domain_id} | {width or ''} | {scale or ''} | {nullable} | {default} |")
-
-        output.append("")
+            column_models.append(
+                ColumnInfo(
+                    name=col_name,
+                    type=domain_id,
+                    length=width,
+                    scale=scale,
+                    nullable=(nulls == "Y"),
+                    default_value=default_val,
+                    is_primary_key=False  # Will update below
+                )
+            )
 
         # Get primary keys using SYS.SYSIDX (index_category = 1)
         cursor.execute(
@@ -180,20 +215,30 @@ def get_table_details(table_name: str) -> str:
             [table_name] + authorized_users,
         )
 
-        pkeys = cursor.fetchall()
-        if pkeys:
-            output.append("### Primary Keys")
-            output.append("")
-            # Group by index name
-            pk_dict = {}
-            for pk_name, col_name in pkeys:
-                if pk_name not in pk_dict:
-                    pk_dict[pk_name] = []
-                pk_dict[pk_name].append(col_name)
+        pkeys_data = cursor.fetchall()
 
-            for pk_name, cols in pk_dict.items():
-                output.append(f"- **{pk_name}**: {', '.join(cols)}")
-            output.append("")
+        # Build PrimaryKeyInfo models and mark primary key columns
+        pk_models = []
+        pk_columns = set()
+        pk_dict = {}
+        for pk_name, col_name in pkeys_data:
+            if pk_name not in pk_dict:
+                pk_dict[pk_name] = []
+            pk_dict[pk_name].append(col_name)
+            pk_columns.add(col_name)
+
+        for pk_name, cols in pk_dict.items():
+            pk_models.append(
+                PrimaryKeyInfo(
+                    name=pk_name,
+                    column_names=cols
+                )
+            )
+
+        # Update is_primary_key flag in columns
+        for col in column_models:
+            if col.name in pk_columns:
+                col.is_primary_key = True
 
         # Get foreign keys using SYS.SYSFKEY
         cursor.execute(
@@ -215,13 +260,21 @@ def get_table_details(table_name: str) -> str:
             [table_name] + authorized_users,
         )
 
-        fkeys = cursor.fetchall()
-        if fkeys:
-            output.append("### Foreign Keys")
-            output.append("")
-            for fk_name, primary_table, primary_key in fkeys:
-                output.append(f"- **{fk_name}**: → {primary_table}({primary_key})")
-            output.append("")
+        fkeys_data = cursor.fetchall()
+
+        # Build ForeignKeyInfo models
+        fk_models = []
+        for fk_name, primary_table, primary_key in fkeys_data:
+            fk_models.append(
+                ForeignKeyInfo(
+                    name=fk_name,
+                    column_names=[],  # Simplified - would need additional query
+                    referenced_table=primary_table,
+                    referenced_columns=[],  # Simplified
+                    on_delete=None,
+                    on_update=None
+                )
+            )
 
         # Get indexes using SYS.SYSIDX
         cursor.execute(
@@ -239,30 +292,70 @@ def get_table_details(table_name: str) -> str:
             [table_name] + authorized_users,
         )
 
-        indexes = cursor.fetchall()
-        if indexes:
-            output.append("### Indexes")
-            output.append("")
-            # Group by index name
-            idx_dict = {}
-            for idx_name, unique, col_name, order_val in indexes:
-                if idx_name not in idx_dict:
-                    idx_dict[idx_name] = {"unique": unique, "columns": []}
-                idx_dict[idx_name]["columns"].append(f"{col_name} {'ASC' if order_val == 'A' else 'DESC'}")
+        indexes_data = cursor.fetchall()
 
-            for idx_name, idx_info in idx_dict.items():
-                unique_str = "Unique " if idx_info["unique"] == "Y" else ""
-                cols = ", ".join(idx_info["columns"])
-                output.append(f"- **{idx_name}**: ({unique_str}{cols})")
-            output.append("")
+        # Build IndexInfo models
+        idx_models = []
+        idx_dict = {}
+        for idx_name, unique, col_name, order_val in indexes_data:
+            if idx_name not in idx_dict:
+                idx_dict[idx_name] = {"unique": unique, "columns": []}
+            idx_dict[idx_name]["columns"].append(
+                IndexColumn(
+                    column_name=col_name,
+                    order="ASC" if order_val == "A" else "DESC"
+                )
+            )
 
-        return "\n".join(output)
+        for idx_name, idx_info in idx_dict.items():
+            idx_models.append(
+                IndexInfo(
+                    name=idx_name,
+                    table_name=table_name,
+                    is_unique=(idx_info["unique"] == "Y"),
+                    is_primary_key=False,  # Would need additional check
+                    columns=idx_info["columns"],
+                    index_type=None
+                )
+            )
+
+        # Format output based on response_format
+        if response_format == ResponseFormat.JSON:
+            # Build complete TableInfo model
+            table_model = TableInfo(
+                name=table_name_result,
+                owner=owner_name,
+                table_type=table_type,
+                row_count=row_count,
+                columns=column_models,
+                primary_keys=pk_models,
+                foreign_keys=fk_models,
+                indexes=idx_models,
+                check_constraints=[]  # Not implemented yet
+            )
+            return table_model.model_dump_json(indent=2)
+        else:
+            # Use formatter for markdown
+            return formatters.format_table_details_markdown(
+                table_name=table_name_result,
+                owner=owner_name,
+                table_type=table_type,
+                row_count=row_count,
+                columns=columns_data,
+                primary_keys=pkeys_data,
+                foreign_keys=fkeys_data,
+                indexes=indexes_data
+            )
 
     finally:
         cursor.close()
 
 
-def list_views(owner: Optional[str] = None, limit: int = 100) -> str:
+def list_views(
+    owner: Optional[str] = None,
+    limit: int = 100,
+    response_format: ResponseFormat = ResponseFormat.MARKDOWN
+) -> str:
     """
     List all views in the database.
 
@@ -310,22 +403,37 @@ def list_views(owner: Optional[str] = None, limit: int = 100) -> str:
 
         views = cursor.fetchmany(limit)
 
-        output = []
-        output.append(f"## Views ({len(views)} found)")
-        output.append("")
-        output.append("| View Name | Owner |")
-        output.append("|-----------|-------|")
+        # Format output based on response_format
+        if response_format == ResponseFormat.JSON:
+            # Convert to Pydantic models and return JSON
+            view_models = []
+            for view_name, view_owner in views:
+                view_models.append(
+                    ViewInfo(
+                        name=view_name,
+                        owner=view_owner,
+                        definition=None
+                    )
+                )
 
-        for view_name, view_owner in views:
-            output.append(f"| {view_name} | {view_owner} |")
-
-        return "\n".join(output)
+            response = ViewListResponse(
+                views=view_models,
+                total_count=len(view_models),
+                has_more=False
+            )
+            return response.model_dump_json(indent=2)
+        else:
+            # Use formatter for markdown
+            return formatters.format_view_list_markdown(views, len(views))
 
     finally:
         cursor.close()
 
 
-def get_view_details(view_name: str) -> str:
+def get_view_details(
+    view_name: str,
+    response_format: ResponseFormat = ResponseFormat.MARKDOWN
+) -> str:
     """
     Get detailed information about a specific view.
 
@@ -358,9 +466,9 @@ def get_view_details(view_name: str) -> str:
         if not view_info:
             raise DatabaseNotFoundError("view", view_name)
 
-        output = []
-        output.append(f"## View: {view_info[1]}.{view_info[0]}")
-        output.append("")
+        # Extract view info
+        view_name_result = view_info[0]
+        owner_name = view_info[1]
 
         # Get columns using SYS.SYSTABCOL with SYS.SYSDOMAIN
         col_query = f"""
@@ -376,25 +484,50 @@ def get_view_details(view_name: str) -> str:
         """
 
         cursor.execute(col_query, [view_name] + authorized_users)
-        columns = cursor.fetchall()
+        columns_data = cursor.fetchall()
 
-        if columns:
-            output.append(f"### Columns ({len(columns)})")
-            output.append("")
-            output.append("| Column | Type | Nullable |")
-            output.append("|--------|------|----------|")
+        # Build ColumnInfo models
+        column_models = []
+        for col_name, data_type, nulls in columns_data:
+            column_models.append(
+                ColumnInfo(
+                    name=col_name,
+                    type=data_type,
+                    length=None,
+                    scale=None,
+                    nullable=(nulls == "Y"),
+                    default_value=None,
+                    is_primary_key=False
+                )
+            )
 
-            for col_name, data_type, nulls in columns:
-                nullable = "YES" if nulls == "Y" else "NO"
-                output.append(f"| {col_name} | {data_type} | {nullable} |")
-
-        return "\n".join(output)
+        # Format output based on response_format
+        if response_format == ResponseFormat.JSON:
+            # Build ViewInfo model with columns
+            view_model = ViewInfo(
+                name=view_name_result,
+                owner=owner_name,
+                definition=None,  # Would need additional query
+                columns=column_models
+            )
+            return view_model.model_dump_json(indent=2)
+        else:
+            # Use formatter for markdown
+            return formatters.format_view_details_markdown(
+                view_name=view_name_result,
+                owner=owner_name,
+                columns=columns_data
+            )
 
     finally:
         cursor.close()
 
 
-def list_procedures(owner: Optional[str] = None, limit: int = 100) -> str:
+def list_procedures(
+    owner: Optional[str] = None,
+    limit: int = 100,
+    response_format: ResponseFormat = ResponseFormat.MARKDOWN
+) -> str:
     """
     List all stored procedures and functions.
 
@@ -432,22 +565,40 @@ def list_procedures(owner: Optional[str] = None, limit: int = 100) -> str:
         cursor.execute(query, params)
         procedures = cursor.fetchall()
 
-        output = []
-        output.append(f"## Procedures & Functions ({len(procedures)} found)")
-        output.append("")
-        output.append("| Name | Owner |")
-        output.append("|------|-------|")
+        # Format output based on response_format
+        if response_format == ResponseFormat.JSON:
+            # Convert to Pydantic models and return JSON
+            proc_models = []
+            for proc_name, proc_owner in procedures:
+                proc_models.append(
+                    ProcedureInfo(
+                        name=proc_name,
+                        owner=proc_owner,
+                        procedure_type="PROCEDURE",  # Simplified
+                        parameters=[],
+                        return_type=None,
+                        definition=None
+                    )
+                )
 
-        for proc_name, proc_owner in procedures:
-            output.append(f"| {proc_name} | {proc_owner} |")
-
-        return "\n".join(output)
+            response = ProcedureListResponse(
+                procedures=proc_models,
+                total_count=len(proc_models),
+                has_more=False
+            )
+            return response.model_dump_json(indent=2)
+        else:
+            # Use formatter for markdown
+            return formatters.format_procedure_list_markdown(procedures, len(procedures))
 
     finally:
         cursor.close()
 
 
-def get_procedure_details(procedure_name: str) -> str:
+def get_procedure_details(
+    procedure_name: str,
+    response_format: ResponseFormat = ResponseFormat.MARKDOWN
+) -> str:
     """
     Get detailed information about a specific procedure.
 
@@ -479,9 +630,9 @@ def get_procedure_details(procedure_name: str) -> str:
         if not proc_info:
             raise DatabaseNotFoundError("procedure", procedure_name)
 
-        output = []
-        output.append(f"## Procedure: {proc_info[1]}.{proc_info[0]}")
-        output.append("")
+        # Extract procedure info
+        proc_name_result = proc_info[0]
+        owner_name = proc_info[1]
 
         # Get parameters using SYS.SYSPROCPARM with SYS.SYSDOMAIN for data types
         param_query = f"""
@@ -501,38 +652,56 @@ def get_procedure_details(procedure_name: str) -> str:
         """
 
         cursor.execute(param_query, [procedure_name] + authorized_users)
-        params = cursor.fetchall()
+        params_data = cursor.fetchall()
 
-        if params:
-            output.append("### Parameters")
-            output.append("")
-            output.append("| Name | Type | Mode |")
-            output.append("|------|------|------|")
+        # Build ProcedureParameter models
+        param_models = []
+        for parm_name, data_type, mode_in, mode_out in params_data:
+            # Determine parameter mode
+            if mode_in == 'Y' and mode_out == 'Y':
+                mode = 'INOUT'
+            elif mode_out == 'Y':
+                mode = 'OUT'
+            else:
+                mode = 'IN'
 
-            for parm_name, data_type, mode_in, mode_out in params:
-                # Determine parameter mode
-                if mode_in == 'Y' and mode_out == 'Y':
-                    mode = 'INOUT'
-                elif mode_out == 'Y':
-                    mode = 'OUT'
-                else:
-                    mode = 'IN'
-                output.append(f"| {parm_name} | {data_type} | {mode} |")
+            param_models.append(
+                ProcedureParameter(
+                    name=parm_name,
+                    type=data_type,
+                    mode=mode
+                )
+            )
 
-            output.append("")
+        # Format output based on response_format
+        if response_format == ResponseFormat.JSON:
+            # Build ProcedureInfo model
+            proc_model = ProcedureInfo(
+                name=proc_name_result,
+                owner=owner_name,
+                procedure_type="PROCEDURE",  # Simplified - would need additional query
+                parameters=param_models,
+                return_type=None,  # Functions only - would need additional query
+                definition=None  # Would need additional query
+            )
+            return proc_model.model_dump_json(indent=2)
         else:
-            output.append("### Parameters")
-            output.append("")
-            output.append("No parameters found")
-            output.append("")
-
-        return "\n".join(output)
+            # Use formatter for markdown
+            return formatters.format_procedure_details_markdown(
+                procedure_name=proc_name_result,
+                owner=owner_name,
+                parameters=params_data
+            )
 
     finally:
         cursor.close()
 
 
-def list_indexes(table_name: Optional[str] = None, limit: int = 100) -> str:
+def list_indexes(
+    table_name: Optional[str] = None,
+    limit: int = 100,
+    response_format: ResponseFormat = ResponseFormat.MARKDOWN
+) -> str:
     """
     List all indexes in the database.
 
@@ -571,23 +740,40 @@ def list_indexes(table_name: Optional[str] = None, limit: int = 100) -> str:
         cursor.execute(query, params)
         indexes = cursor.fetchall()
 
-        output = []
-        output.append(f"## Indexes ({len(indexes)} found)")
-        output.append("")
-        output.append("| Index Name | Table | Owner | Unique |")
-        output.append("|------------|-------|-------|--------|")
+        # Format output based on response_format
+        if response_format == ResponseFormat.JSON:
+            # Convert to Pydantic models and return JSON
+            index_models = []
+            for idx_name, tbl_name, unique, owner in indexes:
+                index_models.append(
+                    IndexInfo(
+                        name=idx_name,
+                        table_name=tbl_name,
+                        is_unique=(unique == "Y"),
+                        is_primary_key=False,  # Simplified
+                        columns=[],
+                        index_type=None
+                    )
+                )
 
-        for idx_name, tbl_name, unique, owner in indexes:
-            unique_str = "Yes" if unique == "Y" else "No"
-            output.append(f"| {idx_name} | {tbl_name} | {owner} | {unique_str} |")
-
-        return "\n".join(output)
+            response = IndexListResponse(
+                indexes=index_models,
+                total_count=len(index_models),
+                has_more=False
+            )
+            return response.model_dump_json(indent=2)
+        else:
+            # Use formatter for markdown
+            return formatters.format_index_list_markdown(indexes, len(indexes))
 
     finally:
         cursor.close()
 
 
-def get_index_details(index_name: str) -> str:
+def get_index_details(
+    index_name: str,
+    response_format: ResponseFormat = ResponseFormat.MARKDOWN
+) -> str:
     """
     Get detailed information about a specific index.
 
@@ -620,11 +806,11 @@ def get_index_details(index_name: str) -> str:
         if not index_info:
             raise DatabaseNotFoundError("index", index_name)
 
-        output = []
-        output.append(f"## Index: {index_info[0]}")
-        output.append(f"**Table**: {index_info[3]}.{index_info[2]}")
-        output.append(f"**Unique**: {'Yes' if index_info[1] == 'Y' else 'No'}")
-        output.append("")
+        # Extract index info
+        index_name_result = index_info[0]
+        is_unique = index_info[1]
+        table_name_result = index_info[2]
+        owner_name = index_info[3]
 
         # Get index columns using SYS.SYSIDXCOL
         col_query = f"""
@@ -640,19 +826,39 @@ def get_index_details(index_name: str) -> str:
         """
 
         cursor.execute(col_query, [index_name] + authorized_users)
-        columns = cursor.fetchall()
+        columns_data = cursor.fetchall()
 
-        if columns:
-            output.append("### Columns")
-            output.append("")
-            output.append("| Column | Order | Sequence |")
-            output.append("|--------|-------|----------|")
+        # Build IndexColumn models
+        column_models = []
+        for col_name, order_val, seq in columns_data:
+            column_models.append(
+                IndexColumn(
+                    column_name=col_name,
+                    order="ASC" if order_val == "A" else "DESC"
+                )
+            )
 
-            for col_name, order_val, seq in columns:
-                order_str = "ASC" if order_val == "A" else "DESC"
-                output.append(f"| {col_name} | {order_str} | {seq} |")
-
-        return "\n".join(output)
+        # Format output based on response_format
+        if response_format == ResponseFormat.JSON:
+            # Build IndexInfo model
+            index_model = IndexInfo(
+                name=index_name_result,
+                table_name=table_name_result,
+                is_unique=(is_unique == "Y"),
+                is_primary_key=False,  # Would need additional check
+                columns=column_models,
+                index_type=None
+            )
+            return index_model.model_dump_json(indent=2)
+        else:
+            # Use formatter for markdown
+            return formatters.format_index_details_markdown(
+                index_name=index_name_result,
+                table_name=table_name_result,
+                owner=owner_name,
+                is_unique=(is_unique == "Y"),
+                columns=columns_data
+            )
 
     finally:
         cursor.close()

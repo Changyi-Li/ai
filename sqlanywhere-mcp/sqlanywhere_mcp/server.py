@@ -16,6 +16,7 @@ from mcp.types import (
 from sqlanywhere_mcp import schema, queries
 from sqlanywhere_mcp.db import get_connection_manager
 from sqlanywhere_mcp.errors import MCPError
+from sqlanywhere_mcp.models import ResponseFormat
 
 # Create server instance
 server = Server("sqlanywhere-mcp")
@@ -89,6 +90,12 @@ async def handle_list_tools() -> list[Tool]:
                         "description": "Maximum number of tables to return (default: 100)",
                         "default": 100,
                     },
+                    "response_format": {
+                        "type": "string",
+                        "enum": ["markdown", "json"],
+                        "description": "Output format (default: markdown)",
+                        "default": "markdown",
+                    },
                 },
             },
         ),
@@ -109,6 +116,12 @@ async def handle_list_tools() -> list[Tool]:
                     "table_name": {
                         "type": "string",
                         "description": "Name of the table",
+                    },
+                    "response_format": {
+                        "type": "string",
+                        "enum": ["markdown", "json"],
+                        "description": "Output format (default: markdown)",
+                        "default": "markdown",
                     },
                 },
                 "required": ["table_name"],
@@ -139,6 +152,12 @@ async def handle_list_tools() -> list[Tool]:
                         "description": "Maximum number of views to return (default: 100)",
                         "default": 100,
                     },
+                    "response_format": {
+                        "type": "string",
+                        "enum": ["markdown", "json"],
+                        "description": "Output format (default: markdown)",
+                        "default": "markdown",
+                    },
                 },
             },
         ),
@@ -159,6 +178,12 @@ async def handle_list_tools() -> list[Tool]:
                     "view_name": {
                         "type": "string",
                         "description": "Name of the view",
+                    },
+                    "response_format": {
+                        "type": "string",
+                        "enum": ["markdown", "json"],
+                        "description": "Output format (default: markdown)",
+                        "default": "markdown",
                     },
                 },
                 "required": ["view_name"],
@@ -189,6 +214,12 @@ async def handle_list_tools() -> list[Tool]:
                         "description": "Maximum number of procedures to return (default: 100)",
                         "default": 100,
                     },
+                    "response_format": {
+                        "type": "string",
+                        "enum": ["markdown", "json"],
+                        "description": "Output format (default: markdown)",
+                        "default": "markdown",
+                    },
                 },
             },
         ),
@@ -209,6 +240,12 @@ async def handle_list_tools() -> list[Tool]:
                     "procedure_name": {
                         "type": "string",
                         "description": "Name of the procedure",
+                    },
+                    "response_format": {
+                        "type": "string",
+                        "enum": ["markdown", "json"],
+                        "description": "Output format (default: markdown)",
+                        "default": "markdown",
                     },
                 },
                 "required": ["procedure_name"],
@@ -240,6 +277,12 @@ async def handle_list_tools() -> list[Tool]:
                         "description": "Maximum number of indexes to return (default: 100)",
                         "default": 100,
                     },
+                    "response_format": {
+                        "type": "string",
+                        "enum": ["markdown", "json"],
+                        "description": "Output format (default: markdown)",
+                        "default": "markdown",
+                    },
                 },
             },
         ),
@@ -260,6 +303,12 @@ async def handle_list_tools() -> list[Tool]:
                     "index_name": {
                         "type": "string",
                         "description": "Name of the index",
+                    },
+                    "response_format": {
+                        "type": "string",
+                        "enum": ["markdown", "json"],
+                        "description": "Output format (default: markdown)",
+                        "default": "markdown",
                     },
                 },
                 "required": ["index_name"],
@@ -308,6 +357,12 @@ async def handle_list_tools() -> list[Tool]:
                         "type": "integer",
                         "description": "Maximum rows to return (default: 1000, max: 10000)",
                     },
+                    "response_format": {
+                        "type": "string",
+                        "enum": ["markdown", "json"],
+                        "description": "Output format (default: markdown)",
+                        "default": "markdown",
+                    },
                 },
                 "required": ["query"],
             },
@@ -350,6 +405,12 @@ async def handle_list_tools() -> list[Tool]:
                         "type": "integer",
                         "description": "Row limit (default: 100)",
                     },
+                    "response_format": {
+                        "type": "string",
+                        "enum": ["markdown", "json"],
+                        "description": "Output format (default: markdown)",
+                        "default": "markdown",
+                    },
                 },
                 "required": ["table_name"],
             },
@@ -385,6 +446,13 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
     if arguments is None:
         arguments = {}
 
+    # Extract response_format with default
+    response_format_str = arguments.get("response_format", "markdown")
+    try:
+        response_format = ResponseFormat(response_format_str)
+    except ValueError:
+        response_format = ResponseFormat.MARKDOWN
+
     try:
         if name == "sqlanywhere_connect":
             # Just establish connection
@@ -403,52 +471,60 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         elif name == "sqlanywhere_list_tables":
             result = schema.list_tables(
                 owner=arguments.get("owner"),
-                limit=arguments.get("limit", 100)
+                limit=arguments.get("limit", 100),
+                response_format=response_format
             )
             return [TextContent(type="text", text=result)]
 
         elif name == "sqlanywhere_get_table_details":
             result = schema.get_table_details(
-                table_name=arguments["table_name"]
+                table_name=arguments["table_name"],
+                response_format=response_format
             )
             return [TextContent(type="text", text=result)]
 
         elif name == "sqlanywhere_list_views":
             result = schema.list_views(
                 owner=arguments.get("owner"),
-                limit=arguments.get("limit", 100)
+                limit=arguments.get("limit", 100),
+                response_format=response_format
             )
             return [TextContent(type="text", text=result)]
 
         elif name == "sqlanywhere_get_view_details":
             result = schema.get_view_details(
-                view_name=arguments["view_name"]
+                view_name=arguments["view_name"],
+                response_format=response_format
             )
             return [TextContent(type="text", text=result)]
 
         elif name == "sqlanywhere_list_procedures":
             result = schema.list_procedures(
                 owner=arguments.get("owner"),
-                limit=arguments.get("limit", 100)
+                limit=arguments.get("limit", 100),
+                response_format=response_format
             )
             return [TextContent(type="text", text=result)]
 
         elif name == "sqlanywhere_get_procedure_details":
             result = schema.get_procedure_details(
-                procedure_name=arguments["procedure_name"]
+                procedure_name=arguments["procedure_name"],
+                response_format=response_format
             )
             return [TextContent(type="text", text=result)]
 
         elif name == "sqlanywhere_list_indexes":
             result = schema.list_indexes(
                 table_name=arguments.get("table_name"),
-                limit=arguments.get("limit", 100)
+                limit=arguments.get("limit", 100),
+                response_format=response_format
             )
             return [TextContent(type="text", text=result)]
 
         elif name == "sqlanywhere_get_index_details":
             result = schema.get_index_details(
-                index_name=arguments["index_name"]
+                index_name=arguments["index_name"],
+                response_format=response_format
             )
             return [TextContent(type="text", text=result)]
 
@@ -459,7 +535,8 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         elif name == "sqlanywhere_execute_query":
             result = queries.execute_query(
                 query=arguments["query"],
-                limit=arguments.get("limit")
+                limit=arguments.get("limit"),
+                response_format=response_format
             )
             return [TextContent(type="text", text=result)]
 
@@ -469,7 +546,8 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
                 columns=arguments.get("columns", "*"),
                 where=arguments.get("where"),
                 order_by=arguments.get("order_by"),
-                limit=arguments.get("limit")
+                limit=arguments.get("limit"),
+                response_format=response_format
             )
             return [TextContent(type="text", text=result)]
 

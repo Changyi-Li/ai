@@ -1,8 +1,133 @@
 """Pydantic models for SQL Anywhere database schema objects."""
 
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from enum import Enum
+from pydantic import BaseModel, Field, field_validator
 
+
+# ============================================================================
+# Response Format Enum
+# ============================================================================
+
+class ResponseFormat(str, Enum):
+    """Response format options for tool outputs."""
+    MARKDOWN = "markdown"
+    JSON = "json"
+
+
+# ============================================================================
+# Response Wrapper Models
+# ============================================================================
+
+class TableListResponse(BaseModel):
+    """Response from list_tables tool."""
+    tables: List[TableInfo] = Field(description="List of tables")
+    total_count: int = Field(description="Total number of tables found")
+    has_more: bool = Field(description="Whether more tables exist beyond the limit")
+
+
+class ViewListResponse(BaseModel):
+    """Response from list_views tool."""
+    views: List[ViewInfo] = Field(description="List of views")
+    total_count: int = Field(description="Total number of views found")
+    has_more: bool = Field(description="Whether more views exist beyond the limit")
+
+
+class ProcedureListResponse(BaseModel):
+    """Response from list_procedures tool."""
+    procedures: List[ProcedureInfo] = Field(description="List of procedures")
+    total_count: int = Field(description="Total number of procedures found")
+    has_more: bool = Field(description="Whether more procedures exist beyond the limit")
+
+
+class IndexListResponse(BaseModel):
+    """Response from list_indexes tool."""
+    indexes: List[IndexInfo] = Field(description="List of indexes")
+    total_count: int = Field(description="Total number of indexes found")
+    has_more: bool = Field(description="Whether more indexes exist beyond the limit")
+
+
+# ============================================================================
+# Input Validation Models
+# ============================================================================
+
+class TableQueryInput(BaseModel):
+    """Input validation for table-related queries."""
+    table_name: str = Field(..., min_length=3, max_length=200, description="Table name with schema prefix")
+
+    @field_validator('table_name')
+    def validate_schema_prefix(cls, v):
+        """Validate that table_name includes schema prefix."""
+        if '.' not in v:
+            raise ValueError("Must include schema/owner prefix (e.g., 'monitor.Part', 'dbo.Customers')")
+        # Basic SQL injection prevention
+        import re
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$", v):
+            raise ValueError(f"Invalid table name format: '{v}'")
+        return v
+
+
+class QueryInput(BaseModel):
+    """Input validation for SQL queries."""
+    query: str = Field(..., min_length=1, max_length=10000, description="SQL SELECT query")
+
+    @field_validator('query')
+    def validate_is_select(cls, v):
+        """Validate that query starts with SELECT."""
+        if not v.strip().upper().startswith("SELECT"):
+            raise ValueError("Only SELECT queries are allowed")
+        return v
+
+
+class ColumnsInput(BaseModel):
+    """Input validation for column specifications."""
+    columns: str = Field(default="*", description="Columns to select")
+
+    @field_validator('columns')
+    def validate_column_names(cls, v):
+        """Validate column names for SQL injection."""
+        if v != "*":
+            import re
+            col_list = [c.strip() for c in v.split(",")]
+            for col in col_list:
+                if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", col):
+                    raise ValueError(f"Invalid column name: '{col}'")
+        return v
+
+
+class OrderByInput(BaseModel):
+    """Input validation for ORDER BY clauses."""
+    order_by: Optional[str] = Field(default=None, description="ORDER BY clause")
+
+    @field_validator('order_by')
+    def validate_order_by(cls, v):
+        """Validate ORDER BY clause format."""
+        if v:
+            import re
+            pattern = r"^[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?(,\s*[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?)*$"
+            if not re.match(pattern, v, re.IGNORECASE):
+                raise ValueError(f"Invalid ORDER BY clause: '{v}'")
+        return v
+
+
+class WhereInput(BaseModel):
+    """Input validation for WHERE clauses."""
+    where: Optional[str] = Field(default=None, description="WHERE clause condition")
+
+    @field_validator('where')
+    def validate_where(cls, v):
+        """Validate WHERE clause for SQL injection patterns."""
+        if v:
+            import re
+            # Check for dangerous patterns
+            if re.search(r";|--|/\*|\*/", v, re.IGNORECASE):
+                raise ValueError("Invalid characters in WHERE clause (detected comment or statement separator)")
+        return v
+
+
+# ============================================================================
+# Existing Schema Models (unchanged)
+# ============================================================================
 
 class ColumnInfo(BaseModel):
     """Information about a table column."""
@@ -71,6 +196,7 @@ class ViewInfo(BaseModel):
     name: str = Field(description="View name")
     owner: str = Field(description="View owner/schema")
     definition: Optional[str] = Field(default=None, description="View definition SQL")
+    columns: List[ColumnInfo] = Field(default=[], description="View columns")
 
 
 class ProcedureParameter(BaseModel):

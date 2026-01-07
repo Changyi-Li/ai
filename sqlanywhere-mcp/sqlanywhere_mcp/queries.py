@@ -1,21 +1,29 @@
 """Data query execution tools for SQL Anywhere."""
 
 import re
+import json
 from typing import Optional, List
 from sqlanywhere_mcp.db import get_connection_manager
 from sqlanywhere_mcp.errors import QueryValidationError, InvalidParameterError, DatabaseError
+from sqlanywhere_mcp.models import ResponseFormat, QueryResult
+from sqlanywhere_mcp import formatters
 
 
-def execute_query(query: str, limit: Optional[int] = None) -> str:
+def execute_query(
+    query: str,
+    limit: Optional[int] = None,
+    response_format: ResponseFormat = ResponseFormat.MARKDOWN
+) -> str:
     """
     Execute a SELECT query on the database.
 
     Args:
         query: SQL SELECT query to execute
         limit: Maximum number of rows to return (default: use config default)
+        response_format: Output format (markdown or json)
 
     Returns:
-        Markdown formatted query results with metadata
+        Formatted query results in requested format
 
     Raises:
         ValueError: If query is not a SELECT statement
@@ -70,43 +78,25 @@ def execute_query(query: str, limit: Optional[int] = None) -> str:
             query, max_rows=limit
         )
 
-        if not rows:
-            return f"## Query Results\n\nNo rows returned.\n\n**Execution time**: {execution_time:.3f} seconds"
+        # Get column information
+        columns = list(rows[0].keys()) if rows else []
+        column_types = {col: type(rows[0][col]).__name__ for col in columns} if rows else {}
 
-        # Format output
-        output = []
-        output.append("## Query Results")
-        output.append("")
-        output.append(f"**Rows returned**: {row_count:,}")
-        output.append(f"**Execution time**: {execution_time:.3f} seconds")
-        if has_more:
-            output.append(f"**⚠️ Note**: Result set truncated at {limit} rows (more rows exist)")
-        output.append("")
-
-        # Get column names from first row
-        columns = list(rows[0].keys())
-
-        # Create table header
-        output.append("| " + " | ".join(columns) + " |")
-        output.append("| " + " | ".join(["---"] * len(columns)) + " |")
-
-        # Add rows
-        for row in rows:
-            # Convert values to strings and handle None
-            values = []
-            for col in columns:
-                val = row[col]
-                if val is None:
-                    values.append("NULL")
-                else:
-                    # Truncate long strings
-                    val_str = str(val)
-                    if len(val_str) > 100:
-                        val_str = val_str[:97] + "..."
-                    values.append(val_str)
-            output.append("| " + " | ".join(values) + " |")
-
-        return "\n".join(output)
+        # Format output based on response_format
+        if response_format == ResponseFormat.JSON:
+            # Create QueryResult model and return JSON
+            result = QueryResult(
+                rows=rows,
+                row_count=row_count,
+                columns=columns,
+                column_types=column_types,
+                execution_time_seconds=execution_time,
+                has_more=has_more
+            )
+            return result.model_dump_json(indent=2)
+        else:
+            # Use formatter for markdown
+            return formatters.format_query_results_markdown(rows, row_count, execution_time, has_more, limit)
 
     except Exception as e:
         raise DatabaseError("query execution", e)
@@ -118,6 +108,7 @@ def query_builder(
     where: Optional[str] = None,
     order_by: Optional[str] = None,
     limit: Optional[int] = None,
+    response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
     """
     Build and execute a simple SELECT query with parameters.
@@ -193,8 +184,8 @@ def query_builder(
             )
         query += f" ORDER BY {order_by}"
 
-    # Execute the query
-    return execute_query(query, limit)
+    # Execute the query with response_format
+    return execute_query(query, limit, response_format=response_format)
 
 
 def validate_query(query: str) -> str:
