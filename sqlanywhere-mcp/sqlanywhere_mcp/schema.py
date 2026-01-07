@@ -96,6 +96,7 @@ def get_connection_and_cursor():
 
 def list_tables(
     owner: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = 100,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
@@ -105,13 +106,23 @@ def list_tables(
     Uses modern SQL Anywhere system views (SYS.SYSTAB) with security filtering.
 
     Args:
-        owner: Filter by schema/owner (optional)
+        owner: Filter by schema/owner (optional, mutually exclusive with search)
+        search: Case-insensitive substring search on table names (optional, mutually exclusive with owner)
         limit: Maximum number of tables to return
         response_format: Output format (markdown or json)
 
     Returns:
         Formatted table list in requested format
+
+    Raises:
+        ValueError: If both owner and search are provided
     """
+    # Validate mutually exclusive parameters
+    if owner and search:
+        raise ValueError(
+            "The 'owner' and 'search' parameters cannot be used together. "
+            "Please use one or the other, or neither for all tables."
+        )
     cm, conn, cursor = get_connection_and_cursor()
 
     try:
@@ -119,7 +130,23 @@ def list_tables(
 
         # Query SYS.SYSTAB system view for table information
         # SECURITY: Only expose tables created by authorized users
-        if owner:
+        if search:
+            # Case-insensitive substring search using LOWER() function
+            base_query = """
+                SELECT t.table_name, u.user_name AS owner_name, t.table_type_str, t.count
+                FROM SYS.SYSTAB t
+                JOIN SYS.SYSUSER u ON t.creator = u.user_id
+                WHERE LOWER(t.table_name) LIKE LOWER(?)
+                  AND t.table_type_str = 'BASE'
+                  AND u.user_name IN ({users_filter})
+                ORDER BY t.table_name
+            """
+            # Add wildcards for substring matching
+            search_pattern = f"%{search}%"
+            query, params = _apply_security_filter_to_query(
+                base_query, authorized_users, [search_pattern]
+            )
+        elif owner:
             base_query = """
                 SELECT t.table_name, u.user_name AS owner_name, t.table_type_str, t.count
                 FROM SYS.SYSTAB t

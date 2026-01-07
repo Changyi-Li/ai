@@ -71,7 +71,7 @@ async def handle_list_tools() -> list[Tool]:
             description="List all tables in the database. "
             "Returns table names, owners, types, and row counts. "
             "Only exposes tables created by authorized users (configured via SQLANYWHERE_AUTHORIZED_USERS). "
-            "Supports optional filtering by owner/schema.",
+            "Supports optional filtering by owner/schema and substring search on table names.",
             annotations={
                 "readOnlyHint": True,
                 "destructiveHint": False,
@@ -84,6 +84,11 @@ async def handle_list_tools() -> list[Tool]:
                     "owner": {
                         "type": "string",
                         "description": "Filter by schema/owner (optional)",
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "Search for tables by name substring (case-insensitive, optional). "
+                            "Cannot be combined with owner filter. Example: 'part' matches 'PartTable', 'OrderPart', 'PartDetail'",
                     },
                     "limit": {
                         "type": "integer",
@@ -469,8 +474,17 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
             ]
 
         elif name == "sqlanywhere_list_tables":
+            # Validate mutually exclusive parameters
+            if arguments.get("owner") and arguments.get("search"):
+                return [TextContent(
+                    type="text",
+                    text="## Error\n\nThe 'owner' and 'search' parameters cannot be used together. "
+                    "Please use one or the other, or neither for all tables."
+                )]
+
             result = schema.list_tables(
                 owner=arguments.get("owner"),
+                search=arguments.get("search"),
                 limit=arguments.get("limit", 100),
                 response_format=response_format
             )
