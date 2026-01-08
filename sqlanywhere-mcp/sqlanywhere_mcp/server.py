@@ -185,7 +185,8 @@ async def sqlanywhere_get_table_details(params: GetTableDetailsInput):
     Args:
         params (GetTableDetailsInput): Input parameters containing:
             - table_name (str): Table name (REQUIRED).
-              Examples: 'Part', 'Customers', 'Config'
+              Accepts both formats: 'Part' or 'monitor.Part'
+              Examples: 'Part', 'monitor.Part', 'Customers', 'dbo.Customers'
             - response_format (ResponseFormat): Output format - 'markdown' or 'json' (default: 'markdown')
 
     Returns:
@@ -350,7 +351,8 @@ async def sqlanywhere_get_view_details(params: GetViewDetailsInput):
     Args:
         params (GetViewDetailsInput): Input parameters containing:
             - view_name (str): View name (REQUIRED).
-              Examples: 'CustomerView', 'AllCustomers'
+              Accepts both formats: 'CustomerView' or 'monitor.CustomerView'
+              Examples: 'CustomerView', 'monitor.CustomerView', 'AllCustomers'
             - response_format (ResponseFormat): Output format - 'markdown' or 'json' (default: 'markdown')
 
     Returns:
@@ -510,7 +512,8 @@ async def sqlanywhere_get_procedure_details(params: GetProcedureDetailsInput):
     Args:
         params (GetProcedureDetailsInput): Input parameters containing:
             - procedure_name (str): Procedure name (REQUIRED).
-              Examples: 'GetUser', 'sp_get_data'
+              Accepts both formats: 'GetUser' or 'monitor.GetUser'
+              Examples: 'GetUser', 'monitor.GetUser', 'sp_get_data'
             - response_format (ResponseFormat): Output format - 'markdown' or 'json' (default: 'markdown')
 
     Returns:

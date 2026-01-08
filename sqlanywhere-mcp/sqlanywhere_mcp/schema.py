@@ -74,6 +74,25 @@ def _apply_security_filter_to_query(
     return query, params
 
 
+def _parse_object_name(name: str) -> str:
+    """
+    Extract object name from owner.table or owner.view or owner.procedure format.
+
+    If name contains a dot (.), extracts only the object name part.
+    Otherwise, returns name unchanged.
+
+    Args:
+        name: Full name possibly including owner prefix (e.g., 'monitor.Part', 'Part')
+
+    Returns:
+        Just the object name without owner prefix (e.g., 'Part')
+    """
+    if '.' in name:
+        # Extract only the table/view/procedure name (after the dot)
+        return name.split('.')[-1].strip()
+    return name.strip()
+
+
 def get_connection_and_cursor():
     """
     Get database connection and cursor with consistent error handling.
@@ -215,11 +234,14 @@ async def get_table_details(
     Uses modern SQL Anywhere system views with security filtering.
 
     Args:
-        table_name: Name of the table
+        table_name: Name of the table (can include owner prefix, e.g., 'monitor.Part' or 'Part')
 
     Returns:
         Markdown formatted table details
     """
+    # Extract table name if owner prefix is provided (e.g., 'monitor.Part' -> 'Part')
+    table_name = _parse_object_name(table_name)
+
     cm, conn, cursor = get_connection_and_cursor()
 
     try:
@@ -543,11 +565,14 @@ async def get_view_details(
     Get detailed information about a specific view.
 
     Args:
-        view_name: Name of the view
+        view_name: Name of view (can include owner prefix, e.g., 'monitor.CustomerView' or 'CustomerView')
 
     Returns:
         Markdown formatted view details
     """
+    # Extract view name if owner prefix is provided (e.g., 'monitor.CustomerView' -> 'CustomerView')
+    view_name = _parse_object_name(view_name)
+
     cm, conn, cursor = get_connection_and_cursor()
 
     try:
@@ -735,11 +760,14 @@ async def get_procedure_details(
     Get detailed information about a specific procedure.
 
     Args:
-        procedure_name: Name of the procedure
+        procedure_name: Name of procedure (can include owner prefix, e.g., 'monitor.GetUser' or 'GetUser')
 
     Returns:
         Markdown formatted procedure details
     """
+    # Extract procedure name if owner prefix is provided (e.g., 'monitor.GetUser' -> 'GetUser')
+    procedure_name = _parse_object_name(procedure_name)
+
     cm, conn, cursor = get_connection_and_cursor()
 
     try:

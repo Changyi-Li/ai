@@ -243,8 +243,9 @@ Only exposes tables created by authorized users (configured via `SQLANYWHERE_AUT
 Get comprehensive metadata for a specific table including columns, data types, primary keys, foreign keys, indexes, and check constraints.
 
 **Parameters**:
-- `table_name` (required): Name of the table (without owner prefix)
-  - Format: `TableName` (e.g., 'Part', 'Customers')
+- `table_name` (required): Name of the table (accepts both formats)
+  - Formats: `TableName` or `owner.TableName` (e.g., 'Part' or 'monitor.Part')
+  - The owner prefix is automatically stripped if provided
 - `response_format` (optional): Output format - "markdown" or "json" (default: "markdown")
 
 **Returns**: Complete table schema with all constraints and relationships
@@ -269,8 +270,9 @@ List all views in the database with owner information.
 Get detailed information about a specific view including column definitions.
 
 **Parameters**:
-- `view_name` (required): Name of the view (without owner prefix)
-  - Format: `ViewName` (e.g., 'CustomerView', 'AllCustomers')
+- `view_name` (required): Name of the view (accepts both formats)
+  - Formats: `ViewName` or `owner.ViewName` (e.g., 'CustomerView' or 'monitor.CustomerView')
+  - The owner prefix is automatically stripped if provided
 - `response_format` (optional): Output format - "markdown" or "json" (default: "markdown")
 
 **Returns**: View definition and column information
@@ -295,8 +297,9 @@ List all stored procedures and functions in the database.
 Get detailed information about a specific procedure or function including parameters with data types and modes.
 
 **Parameters**:
-- `procedure_name` (required): Name of the procedure (without owner prefix)
-  - Format: `ProcedureName` (e.g., 'GetUser', 'sp_get_data')
+- `procedure_name` (required): Name of the procedure (accepts both formats)
+  - Formats: `ProcedureName` or `owner.ProcedureName` (e.g., 'GetUser' or 'monitor.GetUser')
+  - The owner prefix is automatically stripped if provided
 - `response_format` (optional): Output format - "markdown" or "json" (default: "markdown")
 
 **Returns**: Parameter definitions with IN/OUT/INOUT modes
@@ -404,8 +407,10 @@ sqlanywhere_list_tables(search="Part")
 ### Get table schema
 
 ```python
-# Get detailed table schema
+# Get detailed table schema (both formats work)
 sqlanywhere_get_table_details(table_name="Part")
+# or with owner prefix
+sqlanywhere_get_table_details(table_name="monitor.Part")
 
 # Result:
 ## Table: monitor.Part
@@ -754,12 +759,13 @@ Contributions welcome! Please feel free to submit issues and pull requests.
 - **Model Organization**: Reorganized models.py by tool functionality
   - Grouped input and output models by tool (tables, views, procedures, indexes, queries)
   - Improved maintainability and developer experience
-- **Parameter Clarification**: Updated get_*_details tools to accept names without owner prefix
-  - get_table_details: `table_name` (e.g., 'Part') not 'monitor.Part'
-  - get_view_details: `view_name` (e.g., 'CustomerView') not 'monitor.CustomerView'
-  - get_procedure_details: `procedure_name` (e.g., 'GetUser') not 'monitor.GetUser'
-  - list_indexes: `table_name` filter accepts name without owner prefix
-- **Enhanced Documentation**: Updated README with Pydantic model usage patterns and examples
+- **Flexible Object Name Format**: Enhanced get_*_details tools to accept both name formats
+  - get_table_details: accepts both 'Part' and 'monitor.Part' (owner prefix auto-stripped)
+  - get_view_details: accepts both 'CustomerView' and 'monitor.CustomerView'
+  - get_procedure_details: accepts both 'GetUser' and 'monitor.GetUser'
+  - Added `_parse_object_name()` helper for consistent parsing
+  - Improved user experience with flexible input formats
+- **Enhanced Documentation**: Updated README with flexible parameter formats and examples
 
 ### v0.2.0
 - **Refactored to FastMCP**: Migrated from low-level Server API to FastMCP framework

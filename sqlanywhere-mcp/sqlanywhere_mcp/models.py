@@ -67,7 +67,7 @@ class GetTableDetailsInput(BaseModel):
         extra='forbid'
     )
 
-    table_name: str = Field(..., description="Table name (e.g., 'Part', 'Customers')", min_length=1, max_length=200)
+    table_name: str = Field(..., description="Table name (e.g., 'Part', 'monitor.Part') - Accepts both formats", min_length=1, max_length=200)
     response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN, description="Output format")
 
     @field_validator('table_name')
@@ -223,7 +223,7 @@ class GetViewDetailsInput(BaseModel):
         extra='forbid'
     )
 
-    view_name: str = Field(..., description="View name (e.g., 'CustomerView', 'AllCustomers')", min_length=1, max_length=200)
+    view_name: str = Field(..., description="View name (e.g., 'CustomerView', 'monitor.CustomerView') - Accepts both formats", min_length=1, max_length=200)
     response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN, description="Output format")
 
     @field_validator('view_name')
@@ -301,7 +301,7 @@ class GetProcedureDetailsInput(BaseModel):
         extra='forbid'
     )
 
-    procedure_name: str = Field(..., description="Procedure name (e.g., 'GetUser', 'sp_get_data')", min_length=1, max_length=200)
+    procedure_name: str = Field(..., description="Procedure name (e.g., 'GetUser', 'monitor.GetUser') - Accepts both formats", min_length=1, max_length=200)
     response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN, description="Output format")
 
     @field_validator('procedure_name')
