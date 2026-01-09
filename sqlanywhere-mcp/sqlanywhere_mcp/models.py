@@ -363,16 +363,16 @@ class ListIndexesInput(BaseModel):
         extra='forbid'
     )
 
-    table_name: Optional[str] = Field(default=None, description="Filter by table name (e.g., 'Part', 'Customers')", min_length=1, max_length=200)
+    search: Optional[str] = Field(default=None, description="Search for indexes by name substring (case-insensitive)", min_length=1, max_length=200)
     limit: int = Field(default=100, description="Maximum number of indexes to return", ge=1, le=10000)
     response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN, description="Output format")
 
-    @field_validator('table_name')
+    @field_validator('search')
     @classmethod
-    def validate_table_name(cls, v: Optional[str]) -> Optional[str]:
-        """Validate that table_name is not empty after stripping if provided."""
+    def validate_search(cls, v: Optional[str]) -> Optional[str]:
+        """Validate that search is not empty after stripping if provided."""
         if v is not None and not v.strip():
-            raise ValueError("Table name cannot be empty")
+            raise ValueError("Search cannot be empty")
         return v
 
 
