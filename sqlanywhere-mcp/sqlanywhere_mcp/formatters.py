@@ -3,7 +3,7 @@
 Provides consistent formatting functions for all tool outputs.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlanywhere_mcp.models import (
     TableInfo,
     ViewInfo,
@@ -65,13 +65,25 @@ def format_markdown_section(title: str, content: str, level: int = 2) -> str:
 # Table Formatting
 # ============================================================================
 
-def format_table_list_markdown(tables: List[tuple], total_count: int) -> str:
+def format_table_list_markdown_with_pagination(
+
+    tables: List[tuple],
+    total_count: int,
+    count: int,
+    offset: int,
+    has_more: bool,
+    next_offset: Optional[int]
+) -> str:
     """
-    Format table list as Markdown.
+    Format table list as Markdown with pagination info.
 
     Args:
         tables: List of (table_name, owner, table_type, row_count) tuples
-        total_count: Total number of tables
+        total_count: Total number of tables matching criteria
+        count: Number of tables in current page
+        offset: Starting offset
+        has_more: Whether more tables exist
+        next_offset: Next offset to use for pagination
 
     Returns:
         Markdown formatted table list
@@ -79,11 +91,20 @@ def format_table_list_markdown(tables: List[tuple], total_count: int) -> str:
     output = []
     output.append(f"## Tables ({total_count} found)")
     output.append("")
+
+    if total_count > 0:
+        start_range = offset + 1
+        end_range = offset + count
+        output.append(f"Showing {start_range} to {end_range} of {total_count}")
+        if has_more:
+            output.append(f"*(More results available, use offset={next_offset} to see more)*")
+        output.append("")
+
     output.append("| Table Name | Owner | Type | Row Count |")
     output.append("|------------|-------|------|-----------|")
 
     for table_name, table_owner, table_type, row_count in tables:
-        row_count_str = f"{row_count:,}" if row_count else "N/A"
+        row_count_str = f"{row_count:,}" if row_count is not None else "N/A"
         output.append(f"| {table_name} | {table_owner} | {table_type} | {row_count_str} |")
 
     return "\n".join(output)
@@ -305,13 +326,24 @@ def format_procedure_details_markdown(procedure_name: str, owner: str, parameter
 # Index Formatting
 # ============================================================================
 
-def format_index_list_markdown(indexes: List[tuple], total_count: int) -> str:
+def format_index_list_markdown_with_pagination(
+    indexes: List[tuple],
+    total_count: int,
+    count: int,
+    offset: int,
+    has_more: bool,
+    next_offset: Optional[int]
+) -> str:
     """
-    Format index list as Markdown.
+    Format index list as Markdown with pagination info.
 
     Args:
         indexes: List of (idx_name, table_name, unique, owner) tuples
-        total_count: Total number of indexes
+        total_count: Total number of indexes matching criteria
+        count: Number of indexes in current page
+        offset: Starting offset
+        has_more: Whether more indexes exist
+        next_offset: Next offset to use for pagination
 
     Returns:
         Markdown formatted index list
@@ -319,6 +351,15 @@ def format_index_list_markdown(indexes: List[tuple], total_count: int) -> str:
     output = []
     output.append(f"## Indexes ({total_count} found)")
     output.append("")
+
+    if total_count > 0:
+        start_range = offset + 1
+        end_range = offset + count
+        output.append(f"Showing {start_range} to {end_range} of {total_count}")
+        if has_more:
+            output.append(f"*(More results available, use offset={next_offset} to see more)*")
+        output.append("")
+
     output.append("| Index Name | Table | Owner | Unique |")
     output.append("|------------|-------|-------|--------|")
 

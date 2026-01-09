@@ -40,6 +40,7 @@ class ListTablesInput(BaseModel):
     owner: Optional[str] = Field(default=None, description="Filter by owner (e.g., 'monitor', 'dbo')", min_length=1, max_length=200)
     search: Optional[str] = Field(default=None, description="Search for tables by name substring", min_length=1, max_length=200)
     limit: int = Field(default=100, description="Maximum number of tables to return", ge=1, le=10000)
+    offset: int = Field(default=0, description="Number of results to skip for pagination", ge=0)
     response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN, description="Output format")
 
     @field_validator('owner', 'search')
@@ -178,7 +179,10 @@ class TableListResponse(BaseModel):
     )
     tables: List[TableInfo] = Field(description="List of tables")
     total_count: int = Field(description="Total number of tables found")
-    has_more: bool = Field(description="Whether more tables exist beyond the limit")
+    count: int = Field(description="Number of tables returned in this response")
+    offset: int = Field(description="Current offset position")
+    has_more: bool = Field(description="Whether more tables exist beyond current results")
+    next_offset: Optional[int] = Field(default=None, description="Next offset to use for pagination")
 
 
 # ============================================================================
@@ -365,6 +369,7 @@ class ListIndexesInput(BaseModel):
 
     search: Optional[str] = Field(default=None, description="Search for indexes by name substring (case-insensitive)", min_length=1, max_length=200)
     limit: int = Field(default=100, description="Maximum number of indexes to return", ge=1, le=10000)
+    offset: int = Field(default=0, description="Number of results to skip for pagination", ge=0)
     response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN, description="Output format")
 
     @field_validator('search')
@@ -397,7 +402,10 @@ class IndexListResponse(BaseModel):
     )
     indexes: List[IndexInfo] = Field(description="List of indexes")
     total_count: int = Field(description="Total number of indexes found")
-    has_more: bool = Field(description="Whether more indexes exist beyond the limit")
+    count: int = Field(description="Number of indexes returned in this response")
+    offset: int = Field(description="Current offset position")
+    has_more: bool = Field(description="Whether more indexes exist beyond current results")
+    next_offset: Optional[int] = Field(default=None, description="Next offset to use for pagination")
 
 
 # ============================================================================

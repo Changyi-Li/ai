@@ -104,6 +104,7 @@ async def sqlanywhere_list_tables(params: ListTablesInput):
               Cannot be combined with 'owner'.
               Examples: 'part' matches 'PartTable', 'OrderPart', 'PartDetail'
             - limit (int): Maximum number of tables to return (default: 100, range: 1-10000)
+            - offset (int): Number of results to skip for pagination (default: 0)
             - response_format (ResponseFormat): Output format - 'markdown' or 'json' (default: 'markdown')
 
     Returns:
@@ -111,9 +112,13 @@ async def sqlanywhere_list_tables(params: ListTablesInput):
 
         Markdown format:
         ## Tables (N found)
+        Showing 1 to 100 of N
+        *(More results available, use offset=100 to see more)*
+
         | Table Name | Owner | Type | Row Count |
         |------------|-------|------|-----------|
         | ...
+
 
         JSON format:
         {
@@ -131,7 +136,10 @@ async def sqlanywhere_list_tables(params: ListTablesInput):
                 }
             ],
             "total_count": int,
-            "has_more": bool
+            "count": int,
+            "offset": int,
+            "has_more": bool,
+            "next_offset": int or null
         }
 
     Examples:
@@ -154,6 +162,7 @@ async def sqlanywhere_list_tables(params: ListTablesInput):
             owner=params.owner,
             search=params.search,
             limit=params.limit,
+            offset=params.offset,
             response_format=params.response_format
         )
     except ValueError as e:
@@ -593,13 +602,17 @@ async def sqlanywhere_list_indexes(params: ListIndexesInput):
               Examples: 'idx' matches 'idx_customer', 'idx_product', 'CustomerIdx'
               If not provided, lists all indexes for all authorized tables.
             - limit (int): Maximum number of indexes to return (default: 100, range: 1-10000)
+            - offset (int): Number of results to skip for pagination (default: 0)
             - response_format (ResponseFormat): Output format - 'markdown' or 'json' (default: 'markdown')
 
     Returns:
-        str: Formatted index list with the following schema:
+        str: Formatted index list with following schema:
 
         Markdown format:
         ## Indexes (N found)
+        Showing 1 to 100 of N
+        *(More results available, use offset=100 to see more)*
+
         | Index Name | Table | Owner | Unique |
         |------------|-------|-------|--------|
         | ...
@@ -617,11 +630,14 @@ async def sqlanywhere_list_indexes(params: ListIndexesInput):
                 }
             ],
             "total_count": int,
-            "has_more": bool
+            "count": int,
+            "offset": int,
+            "has_more": bool,
+            "next_offset": int or null
         }
 
     Examples:
-        - Use when: "Show me all indexes in the database"
+        - Use when: "Show me all indexes in database"
         - Use when: "Find indexes containing 'idx' in the name"
         - Don't use when: You need detailed index information (use sqlanywhere_get_index_details)
 
@@ -638,6 +654,7 @@ async def sqlanywhere_list_indexes(params: ListIndexesInput):
         return await schema.list_indexes(
             search=params.search,
             limit=params.limit,
+            offset=params.offset,
             response_format=params.response_format
         )
     except MCPError as e:

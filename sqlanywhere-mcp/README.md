@@ -234,9 +234,10 @@ Only exposes tables created by authorized users (configured via `SQLANYWHERE_AUT
 - `search` (optional): Search for tables by name substring (case-insensitive, mutually exclusive with owner)
   - Example: 'part' matches 'PartTable', 'OrderPart', 'PartDetail'
 - `limit` (optional): Maximum number of tables to return (default: 100, max: 10000)
+- `offset` (optional): Number of results to skip for pagination (default: 0)
 - `response_format` (optional): Output format - "markdown" or "json" (default: "markdown")
 
-**Returns**: Table names, owners, types, and row counts
+**Returns**: Table names, owners, types, and row counts with pagination info
 
 #### `sqlanywhere_get_table_details`
 
@@ -312,10 +313,11 @@ List all indexes in the database with associated table information.
 
 **Parameters**:
 - `search` (optional): Search for indexes by name substring (case-insensitive, e.g., 'idx' matches 'idx_customer', 'idx_product', 'CustomerIdx')
-- `limit` (optional): Maximum number of indexes to return (default: 100)
+- `limit` (optional): Maximum number of indexes to return (default: 100, max: 10000)
+- `offset` (optional): Number of results to skip for pagination (default: 0)
 - `response_format` (optional): Output format - "markdown" or "json" (default: "markdown")
 
-**Returns**: Index names, tables, uniqueness, and column information
+**Returns**: Index names, tables, uniqueness, and column information with pagination info
 
 #### `sqlanywhere_get_index_details`
 
@@ -386,6 +388,36 @@ sqlanywhere_list_tables(search="PART")
 sqlanywhere_list_tables(search="Part")
 ```
 
+### List tables with pagination
+
+```python
+# List tables with pagination (default 100 per page)
+sqlanywhere_list_tables(limit=100, offset=0)
+
+# Result:
+## Tables (150 found)
+Showing 1 to 100 of 150
+*(More results available, use offset=100 to see more)*
+
+| Table Name | Owner | Type | Row Count |
+|------------|-------|------|-----------|
+| Part | monitor | BASE | 9 |
+| OrderPart | monitor | BASE | 523 |
+| ...
+
+# Get next page
+sqlanywhere_list_tables(limit=100, offset=100)
+
+# Result:
+## Tables (150 found)
+Showing 101 to 150 of 150
+*(More results available, use offset=200 to see more)*
+
+| Table Name | Owner | Type | Row Count |
+|------------|-------|------|-----------|
+| ...
+```
+
 ### Get table schema
 
 ```python
@@ -417,6 +449,35 @@ sqlanywhere_get_table_details(table_name="monitor.Part")
 ### Indexes
 - **Part** (Primary Key): (Id ASC)
 - **idx_part_Description**: (Description ASC)
+```
+
+### List indexes with pagination
+
+```python
+# List indexes with pagination
+sqlanywhere_list_indexes(limit=50, offset=0)
+
+# Result:
+## Indexes (150 found)
+Showing 1 to 50 of 150
+*(More results available, use offset=50 to see more)*
+
+| Index Name | Table | Owner | Unique |
+|------------|-------|-------|--------|
+| Part_PK | Part | monitor | Yes |
+| idx_part_desc | Part | monitor | No |
+
+# Get next page
+sqlanywhere_list_indexes(limit=50, offset=50)
+
+# Result:
+## Indexes (150 found)
+Showing 51 to 100 of 150
+*(More results available, use offset=100 to see more)*
+
+| Index Name | Table | Owner | Unique |
+|------------|-------|-------|--------|
+| ...
 ```
 
 ### Execute custom query
@@ -706,7 +767,17 @@ Contributions welcome! Please feel free to submit issues and pull requests.
 
 ## Changelog
 
-### v0.3.0 (Current)
+### v0.4.0 (Current)
+- **Pagination for Indexes**: Implemented pagination support for `sqlanywhere_list_indexes`
+  - Added `offset` parameter to `ListIndexesInput` model (default: 0, ge=0)
+  - Updated `IndexListResponse` to include pagination metadata (count, offset, has_more, next_offset)
+  - Created `format_index_list_markdown_with_pagination()` in formatters.py
+  - Updated `list_indexes()` in schema.py to fetch all matching indexes and apply offset/limit in Python
+  - Consistent pagination behavior with `sqlanywhere_list_tables`
+  - Updated README with offset parameter documentation and pagination examples
+  - Shows "Showing X to Y of N" and offset hint when more results available
+
+### v0.3.0
 - **Pydantic Input Models**: Implemented comprehensive input validation models for all tools
   - 11 dedicated input models (ListTablesInput, GetTableDetailsInput, etc.)
   - Mutual exclusion validation (owner vs search parameters)

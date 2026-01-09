@@ -117,6 +117,7 @@ async def list_tables(
     owner: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = 100,
+    offset: int = 0,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
     """
@@ -128,10 +129,11 @@ async def list_tables(
         owner: Filter by owner (optional, mutually exclusive with search)
         search: Case-insensitive substring search on table names (optional, mutually exclusive with owner)
         limit: Maximum number of tables to return
+        offset: Number of results to skip for pagination (default: 0)
         response_format: Output format (markdown or json)
 
     Returns:
-        Formatted table list in requested format
+        Formatted table list in requested format with pagination info
 
     Raises:
         ValueError: If both owner and search are provided
@@ -187,9 +189,20 @@ async def list_tables(
             """
             query, params = _apply_security_filter_to_query(base_query, authorized_users)
 
+        # Execute query to get all matching tables (for total count)
         cursor.execute(query, params)
+        all_tables = cursor.fetchall()
+        total_count = len(all_tables)
 
-        tables = cursor.fetchmany(limit)
+        # Apply offset and limit for pagination
+        start_index = offset
+        end_index = offset + limit
+        tables = all_tables[start_index:end_index]
+
+        # Calculate pagination info
+        count = len(tables)
+        has_more = total_count > offset + limit
+        next_offset = offset + limit if has_more else None
 
         # Format output based on response_format
         if response_format == ResponseFormat.JSON:
@@ -212,13 +225,18 @@ async def list_tables(
 
             response = TableListResponse(
                 tables=table_models,
-                total_count=len(table_models),
-                has_more=False
+                total_count=total_count,
+                count=count,
+                offset=offset,
+                has_more=has_more,
+                next_offset=next_offset
             )
             return response.model_dump_json(indent=2)
         else:
-            # Use formatter for markdown
-            return formatters.format_table_list_markdown(tables, len(tables))
+            # Use formatter for markdown with pagination info
+            return formatters.format_table_list_markdown_with_pagination(
+                tables, total_count, count, offset, has_more, next_offset
+            )
 
     finally:
         cursor.close()
@@ -859,6 +877,7 @@ async def get_procedure_details(
 async def list_indexes(
     search: Optional[str] = None,
     limit: int = 100,
+    offset: int = 0,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
     """
@@ -867,9 +886,11 @@ async def list_indexes(
     Args:
         search: Search for indexes by name substring (optional)
         limit: Maximum number of indexes to return
+        offset: Number of results to skip for pagination (default: 0)
+        response_format: Output format (markdown or json)
 
     Returns:
-        Markdown formatted index list
+        Formatted index list in requested format with pagination info
     """
     cm, conn, cursor = get_connection_and_cursor()
 
@@ -878,13 +899,13 @@ async def list_indexes(
 
         if search:
             # Case-insensitive substring search using LOWER() function
-            base_query = f"""
-                SELECT TOP {limit} i.index_name, t.table_name, i."unique", u.user_name AS owner_name
+            base_query = """
+                SELECT i.index_name, t.table_name, i."unique", u.user_name AS owner_name
                 FROM SYS.SYSIDX i
                 JOIN SYS.SYSTAB t ON i.table_id = t.table_id
                 JOIN SYS.SYSUSER u ON t.creator = u.user_id
                 WHERE LOWER(i.index_name) LIKE LOWER(?)
-                  AND u.user_name IN ({{users_filter}})
+                  AND u.user_name IN ({users_filter})
                 ORDER BY i.index_name
             """
             # Add wildcards for substring matching
@@ -893,18 +914,30 @@ async def list_indexes(
                 base_query, authorized_users, [search_pattern]
             )
         else:
-            base_query = f"""
-                SELECT TOP {limit} i.index_name, t.table_name, i."unique", u.user_name AS owner_name
+            base_query = """
+                SELECT i.index_name, t.table_name, i."unique", u.user_name AS owner_name
                 FROM SYS.SYSIDX i
                 JOIN SYS.SYSTAB t ON i.table_id = t.table_id
                 JOIN SYS.SYSUSER u ON t.creator = u.user_id
-                WHERE u.user_name IN ({{users_filter}})
+                WHERE u.user_name IN ({users_filter})
                 ORDER BY i.index_name
             """
             query, params = _apply_security_filter_to_query(base_query, authorized_users)
 
+        # Execute query to get all matching indexes (for total count)
         cursor.execute(query, params)
-        indexes = cursor.fetchall()
+        all_indexes = cursor.fetchall()
+        total_count = len(all_indexes)
+
+        # Apply offset and limit for pagination
+        start_index = offset
+        end_index = offset + limit
+        indexes = all_indexes[start_index:end_index]
+
+        # Calculate pagination info
+        count = len(indexes)
+        has_more = total_count > offset + limit
+        next_offset = offset + limit if has_more else None
 
         # Format output based on response_format
         if response_format == ResponseFormat.JSON:
@@ -924,13 +957,18 @@ async def list_indexes(
 
             response = IndexListResponse(
                 indexes=index_models,
-                total_count=len(index_models),
-                has_more=False
+                total_count=total_count,
+                count=count,
+                offset=offset,
+                has_more=has_more,
+                next_offset=next_offset
             )
             return response.model_dump_json(indent=2)
         else:
-            # Use formatter for markdown
-            return formatters.format_index_list_markdown(indexes, len(indexes))
+            # Use formatter for markdown with pagination info
+            return formatters.format_index_list_markdown_with_pagination(
+                indexes, total_count, count, offset, has_more, next_offset
+            )
 
     finally:
         cursor.close()
