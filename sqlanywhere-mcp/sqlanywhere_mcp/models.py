@@ -6,7 +6,7 @@ Models are organized by tool/functionality:
 - View tools (list_views, get_view_details)
 - Procedure tools (list_procedures, get_procedure_details)
 - Index tools (list_indexes, get_index_details)
-- Query tools (execute_query, query_builder, validate_query)
+- Query tools (execute_query, validate_query)
 """
 
 from typing import Optional, List
@@ -423,63 +423,6 @@ class ExecuteQueryInput(BaseModel):
         """Validate that query starts with SELECT."""
         if not v.strip().upper().startswith("SELECT"):
             raise ValueError("Only SELECT queries are allowed")
-        return v
-
-
-class QueryBuilderInput(BaseModel):
-    """Input model for query_builder operations."""
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra='forbid'
-    )
-
-    table_name: str = Field(..., description="Table name with owner prefix (REQUIRED)", min_length=3, max_length=200)
-    columns: str = Field(default="*", description="Columns to select (default: '*')", max_length=1000)
-    where: Optional[str] = Field(default=None, description="WHERE clause condition", max_length=2000)
-    order_by: Optional[str] = Field(default=None, description="ORDER BY clause", max_length=500)
-    limit: Optional[int] = Field(default=None, description="Row limit (default: 100, max: 10000)", ge=1, le=10000)
-    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN, description="Output format")
-
-    @field_validator('table_name')
-    @classmethod
-    def validate_table_name(cls, v: str) -> str:
-        """Validate that table_name includes owner prefix."""
-        if '.' not in v:
-            raise ValueError("Must include owner prefix (e.g., 'monitor.Part', 'dbo.Customers')")
-        return v
-
-    @field_validator('columns')
-    @classmethod
-    def validate_columns(cls, v: str) -> str:
-        """Validate column names for SQL injection."""
-        if v != "*":
-            import re
-            col_list = [c.strip() for c in v.split(",")]
-            for col in col_list:
-                if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", col):
-                    raise ValueError(f"Invalid column name: '{col}'")
-        return v
-
-    @field_validator('where')
-    @classmethod
-    def validate_where(cls, v: Optional[str]) -> Optional[str]:
-        """Validate WHERE clause for SQL injection patterns."""
-        if v:
-            import re
-            if re.search(r";|--|/\*|\*/", v, re.IGNORECASE):
-                raise ValueError("Invalid characters in WHERE clause (detected comment or statement separator)")
-        return v
-
-    @field_validator('order_by')
-    @classmethod
-    def validate_order_by(cls, v: Optional[str]) -> Optional[str]:
-        """Validate ORDER BY clause format."""
-        if v:
-            import re
-            pattern = r"^[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?(,\s*[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?)*$"
-            if not re.match(pattern, v, re.IGNORECASE):
-                raise ValueError(f"Invalid ORDER BY clause: '{v}'")
         return v
 
 
