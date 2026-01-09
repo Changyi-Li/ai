@@ -356,24 +356,6 @@ Execute a SELECT query on the database with comprehensive security validation.
 - Enforces maximum row limits to prevent large result sets
 - Uses parameterized bindings to prevent SQL injection
 
-#### `sqlanywhere_query_builder`
-
-Build and execute a simple SELECT query with automatic validation. Convenience tool for safe query construction.
-
-**Parameters**:
-- `table_name` (required): Table to query with owner prefix
-  - Format: `owner.TableName` (e.g., 'monitor.Part', 'dbo.Customers')
-- `columns` (optional): Columns to select (default: '*')
-  - Example: 'Id,Name,Email'
-- `where` (optional): WHERE clause condition
-- `order_by` (optional): ORDER BY clause
-- `limit` (optional): Row limit (default: 100)
-- `response_format` (optional): Output format - "markdown" or "json" (default: "markdown")
-
-**Returns**: Query results with metadata
-
-**Note**: Automatically uses SQL Anywhere's `TOP` syntax instead of `LIMIT`.
-
 #### `sqlanywhere_validate_query`
 
 Validate a SQL query without executing it. Performs basic safety checks.
@@ -435,32 +417,6 @@ sqlanywhere_get_table_details(table_name="monitor.Part")
 ### Indexes
 - **Part** (Primary Key): (Id ASC)
 - **idx_part_Description**: (Description ASC)
-```
-
-### Query data
-
-```python
-# Using query_builder for simple queries
-sqlanywhere_query_builder(
-    table_name="monitor.Part",
-    columns="Id,PartNumber,Description",
-    where="Type = 1",
-    limit=5
-)
-
-# Result:
-## Query Results
-
-**Rows returned**: 5
-**Execution time**: 0.015 seconds
-
-| Id | PartNumber | Description |
-|----|------------|-------------|
-| 1 | PART-001   | Sample Part 1 |
-| 2 | PART-002   | Sample Part 2 |
-| 3 | PART-003   | Sample Part 3 |
-| 4 | PART-004   | Sample Part 4 |
-| 5 | PART-005   | Sample Part 5 |
 ```
 
 ### Execute custom query
@@ -615,7 +571,7 @@ The implementation follows MCP best practices:
 
 **Error**: `Only SELECT queries are allowed`
 
-**Solution**: The tool intentionally blocks non-SELECT queries. Use `sqlanywhere_query_builder` for safe query construction.
+**Solution**: The tool intentionally blocks non-SELECT queries. Only SELECT queries are allowed for security reasons.
 
 **Error**: `Access to owners X, Y is not authorized`
 

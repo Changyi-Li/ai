@@ -18,7 +18,6 @@ from sqlanywhere_mcp.models import (
     ListIndexesInput,
     GetIndexDetailsInput,
     ExecuteQueryInput,
-    QueryBuilderInput,
     ValidateQueryInput,
 )
 from sqlanywhere_mcp import schema, queries
@@ -851,7 +850,6 @@ async def sqlanywhere_execute_query(params: ExecuteQueryInput):
         - Use when: "List customer names and IDs"
         - Use when: "Join customers with their orders"
         - Don't use when: You need to modify data (INSERT, UPDATE, DELETE are not allowed)
-        - Don't use when: Building simple queries (use sqlanywhere_query_builder instead)
 
     Error Handling:
         - Pydantic validates query starts with SELECT and limit is within range
@@ -873,71 +871,6 @@ async def sqlanywhere_execute_query(params: ExecuteQueryInput):
     except MCPError as e:
         return str(e)
 
-
-@mcp.tool(
-    name="sqlanywhere_query_builder",
-    annotations={
-        "title": "Build and Execute SELECT Query",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": True
-    }
-)
-async def sqlanywhere_query_builder(params: QueryBuilderInput):
-    """Build and execute a simple SELECT query with parameters.
-
-    This is a convenience tool for building safe SELECT queries without writing
-    raw SQL. Supports WHERE, ORDER BY, and TOP clauses. Automatically validates
-    inputs to prevent SQL injection.
-
-    IMPORTANT: table_name must include owner prefix (e.g., 'monitor.Part').
-
-    Args:
-        params (QueryBuilderInput): Input parameters containing:
-            - table_name (str): Table to query with owner prefix (REQUIRED).
-              Format must be: owner.TableName
-              Examples: 'monitor.Part', 'dbo.Customers', 'ExtensionsUser.Config'
-            - columns (str): Columns to select (default: '*'). Comma-separated column names.
-              Examples: 'Id,PartNumber,Description', 'Name,Email,Phone'
-            - where (Optional[str]): WHERE clause condition. Simple conditions only.
-              Examples: 'Type = 1', 'Status = "Active" AND CreatedDate > "2024-01-01"'
-            - order_by (Optional[str]): ORDER BY clause. Column names with optional ASC/DESC.
-              Examples: 'Name', 'CreatedDate DESC', 'LastName, FirstName ASC'
-            - limit (Optional[int]): Row limit (default: 100, max: 10000).
-            - response_format (ResponseFormat): Output format - 'markdown' or 'json' (default: 'markdown')
-
-    Returns:
-        str: Query results in the same format as sqlanywhere_execute_query
-
-    Examples:
-        - Use when: "Get first 10 rows from monitor.Part"
-        - Use when: "Select Id and Name from dbo.Customers where Status is Active"
-        - Use when: "Get all parts ordered by PartNumber"
-        - Don't use when: You need complex queries (joins, subqueries, etc.)
-        - Don't use when: You prefer writing raw SQL (use sqlanywhere_execute_query)
-
-    Error Handling:
-        - Pydantic validates all inputs (table_name owner prefix, columns, where, order_by, limit)
-        - Validation errors returned with descriptive messages
-
-    Security:
-        - All inputs are validated before query construction
-        - Uses parameterized TOP clause (SQL Anywhere syntax)
-        - Only accesses tables from authorized owners
-        - Prevents SQL injection through input validation
-    """
-    try:
-        return await queries.query_builder(
-            table_name=params.table_name,
-            columns=params.columns,
-            where=params.where,
-            order_by=params.order_by,
-            limit=params.limit,
-            response_format=params.response_format
-        )
-    except MCPError as e:
-        return str(e)
 
 
 @mcp.tool(
