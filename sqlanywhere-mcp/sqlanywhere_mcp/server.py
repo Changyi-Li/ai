@@ -590,8 +590,8 @@ async def sqlanywhere_list_indexes(params: ListIndexesInput):
 
     Args:
         params (ListIndexesInput): Input parameters containing:
-            - table_name (Optional[str]): Filter by specific table.
-              Examples: 'Part', 'Customers'
+            - search (Optional[str]): Search for indexes by name substring (case-insensitive).
+              Examples: 'idx' matches 'idx_customer', 'idx_product', 'CustomerIdx'
               If not provided, lists all indexes for all authorized tables.
             - limit (int): Maximum number of indexes to return (default: 100, range: 1-10000)
             - response_format (ResponseFormat): Output format - 'markdown' or 'json' (default: 'markdown')
@@ -623,11 +623,11 @@ async def sqlanywhere_list_indexes(params: ListIndexesInput):
 
     Examples:
         - Use when: "Show me all indexes in the database"
-        - Use when: "List all indexes for the monitor.Part table"
+        - Use when: "Find indexes containing 'idx' in the name"
         - Don't use when: You need detailed index information (use sqlanywhere_get_index_details)
 
     Error Handling:
-        - Pydantic validates input parameters (table_name not empty if provided, limit range)
+        - Pydantic validates input parameters (search not empty if provided, limit range)
         - Returns empty result if no indexes match criteria
         - Validation errors returned with descriptive messages
 
@@ -637,7 +637,7 @@ async def sqlanywhere_list_indexes(params: ListIndexesInput):
     """
     try:
         return await schema.list_indexes(
-            table_name=params.table_name,
+            search=params.search,
             limit=params.limit,
             response_format=params.response_format
         )

@@ -857,7 +857,7 @@ async def get_procedure_details(
 
 
 async def list_indexes(
-    table_name: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = 100,
     response_format: ResponseFormat = ResponseFormat.MARKDOWN
 ) -> str:
@@ -865,7 +865,7 @@ async def list_indexes(
     List all indexes in the database.
 
     Args:
-        table_name: Filter by specific table (optional)
+        search: Search for indexes by name substring (optional)
         limit: Maximum number of indexes to return
 
     Returns:
@@ -876,17 +876,22 @@ async def list_indexes(
     try:
         authorized_users = cm._authorized_users
 
-        if table_name:
+        if search:
+            # Case-insensitive substring search using LOWER() function
             base_query = f"""
                 SELECT TOP {limit} i.index_name, t.table_name, i."unique", u.user_name AS owner_name
                 FROM SYS.SYSIDX i
                 JOIN SYS.SYSTAB t ON i.table_id = t.table_id
                 JOIN SYS.SYSUSER u ON t.creator = u.user_id
-                WHERE t.table_name = ?
+                WHERE LOWER(i.index_name) LIKE LOWER(?)
                   AND u.user_name IN ({{users_filter}})
-                ORDER BY t.table_name, i.index_name
+                ORDER BY i.index_name
             """
-            query, params = _apply_security_filter_to_query(base_query, authorized_users, [table_name])
+            # Add wildcards for substring matching
+            search_pattern = f"%{search}%"
+            query, params = _apply_security_filter_to_query(
+                base_query, authorized_users, [search_pattern]
+            )
         else:
             base_query = f"""
                 SELECT TOP {limit} i.index_name, t.table_name, i."unique", u.user_name AS owner_name
@@ -894,7 +899,7 @@ async def list_indexes(
                 JOIN SYS.SYSTAB t ON i.table_id = t.table_id
                 JOIN SYS.SYSUSER u ON t.creator = u.user_id
                 WHERE u.user_name IN ({{users_filter}})
-                ORDER BY t.table_name, i.index_name
+                ORDER BY i.index_name
             """
             query, params = _apply_security_filter_to_query(base_query, authorized_users)
 

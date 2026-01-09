@@ -311,7 +311,7 @@ Get detailed information about a specific procedure or function including parame
 List all indexes in the database with associated table information.
 
 **Parameters**:
-- `table_name` (optional): Filter by specific table name (without owner prefix, e.g., 'Part')
+- `search` (optional): Search for indexes by name substring (case-insensitive, e.g., 'idx' matches 'idx_customer', 'idx_product', 'CustomerIdx')
 - `limit` (optional): Maximum number of indexes to return (default: 100)
 - `response_format` (optional): Output format - "markdown" or "json" (default: "markdown")
 
