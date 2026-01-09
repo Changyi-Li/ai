@@ -17,9 +17,18 @@ This skill helps you write, explain, and optimize SQL queries for the SQL Anywhe
 
 You have access to the **sqlanywhere-mcp** server. Use these tools to explore the schema before writing queries:
 
-- `sqlanywhere_list_tables`: Find table names.
-- `sqlanywhere_get_table_details`: Get column definitions, keys, and constraints.
-- `sqlanywhere_execute_query`: Run queries (read-only) to verify results.
+- `sqlanywhere_list_tables`: Find table names and metadata.
+- `sqlanywhere_get_table_details`: Get column definitions, keys, and constraints for a table.
+- `sqlanywhere_list_views`: List all views in the database.
+- `sqlanywhere_get_view_details`: Get metadata for a specific view.
+- `sqlanywhere_list_procedures`: List stored procedures and functions.
+- `sqlanywhere_get_procedure_details`: Get parameters and types for a stored procedure.
+- `sqlanywhere_list_indexes`: Find indexes on tables.
+- `sqlanywhere_get_index_details`: Get detailed information about an index.
+- `sqlanywhere_get_database_info`: Get database version and connection info.
+- `sqlanywhere_execute_query`: Run SELECT queries (read-only) to verify results.
+- `sqlanywhere_validate_query`: Check query validity without running it.
+- `sqlanywhere_connect`: Verify database connection (usually automatic).
 
 ## Domain Knowledge
 
