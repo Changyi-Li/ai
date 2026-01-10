@@ -59,4 +59,4 @@ Some columns use integer values to represent business concepts. Always check `re
 - [Enum Definitions](reference/enums.md): Integer to Business Enum mappings.
 - [Finding Referencing Tables](reference/finding-references.md): Guide on how to find tables referencing a specific table.
 - [Example Queries](reference/examples/): Directory of specific query examples.
-  - [Part Details with Units](reference/examples/part-details-with-units.md): Retrieves Part info (Id, Number, Description, Price, Type) with resolved Unit Code/Name.
+  - [Part Details](reference/examples/part-details.md): Retrieves comprehensive Part info including unit, product group, traceability, and inspection settings.
