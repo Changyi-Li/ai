@@ -60,3 +60,4 @@ Some columns use integer values to represent business concepts. Always check `re
 - [Finding Referencing Tables](reference/finding-references.md): Guide on how to find tables referencing a specific table.
 - [Example Queries](reference/examples/): Directory of specific query examples.
   - [Part Details](reference/examples/part-details.md): Retrieves comprehensive Part info including unit, product group, traceability, and inspection settings.
+  - [Part Units](reference/examples/part-units.md): Retrieves parts and all their associated units with conversion factors.
