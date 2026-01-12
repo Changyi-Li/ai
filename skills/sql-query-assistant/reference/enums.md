@@ -4,6 +4,34 @@ In the database, several columns use integer values to represent specific busine
 
 ## Monitor Schema
 
+### FormTemplate Table (`monitor.FormTemplate`)
+
+**Column**: `ControlDataType`
+
+| Integer Value | Enum Name     | Description                   |
+| :------------ | :------------ | :---------------------------- |
+| 0             | Maintenance   | Maintenance form template.    |
+| 1             | MeasuringData | Measuring data form template. |
+
+**Column**: `Type` (Bitmask)
+
+| Integer Value | Enum Name     | Description                     |
+| :------------ | :------------ | :------------------------------ |
+| 0             | None          | Default value.                  |
+| 1             | Manufacturing | Form applied for manufacturing. |
+| 2             | Purchase      | Form applied for purchase.      |
+
+### FormTemplateRows Table (`monitor.FormTemplateRows`)
+
+**Column**: `Type`
+
+| Integer Value | Enum Name | Description          |
+| :------------ | :-------- | :------------------- |
+| 0             | Decimal   | Decimal value type.  |
+| 1             | Text      | Text value type.     |
+| 2             | CheckBox  | CheckBox value type. |
+| 3             | Date      | Date value type.     |
+
 ### Part Table (`monitor.Part`)
 
 **Column**: `Type`
