@@ -13,7 +13,7 @@ In the database, several columns use integer values to represent specific busine
 | 0             | Maintenance   | Maintenance form template.    |
 | 1             | MeasuringData | Measuring data form template. |
 
-**Column**: `Type` (Bitmask)
+**Column**: `FormTemplateUsageType` (Bitmask)
 
 | Integer Value | Enum Name     | Description                     |
 | :------------ | :------------ | :------------------------------ |
@@ -31,6 +31,16 @@ In the database, several columns use integer values to represent specific busine
 | 1             | Text      | Text value type.     |
 | 2             | CheckBox  | CheckBox value type. |
 | 3             | Date      | Date value type.     |
+
+### MeasuringTemplate Table (`monitor.MeasuringTemplate`)
+
+**Column**: `Type` (Bitmask)
+
+| Integer Value | Enum Name     | Description                     |
+| :------------ | :------------ | :------------------------------ |
+| 0             | None          | Default value.                  |
+| 1             | Manufacturing | Form applied for manufacturing. |
+| 2             | Purchase      | Form applied for purchase.      |
 
 ### Part Table (`monitor.Part`)
 

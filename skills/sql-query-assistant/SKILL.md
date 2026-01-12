@@ -61,4 +61,4 @@ Some columns use integer values to represent business concepts. Always check `re
 - [Example Queries](reference/examples/): Directory of specific query examples.
   - [Part Details](reference/examples/part-details.md): Retrieves comprehensive Part info including unit, product group, traceability, and inspection settings.
   - [Part Units](reference/examples/part-units.md): Retrieves parts and all their associated units with conversion factors.
-  - [Measuring Form Template Details](reference/examples/measuring-form-template.md): Retrieves measuring form templates with selection rows and measuring form template rows, including type-specific default values.
+  - [Measuring Template Details](reference/examples/measuring-template-details.md): Retrieves measuring templates with their associated form templates, selection rows, and template rows with type-specific default values.
